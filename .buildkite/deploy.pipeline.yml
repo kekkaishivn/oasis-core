@@ -32,7 +32,7 @@ steps:
     command: .buildkite/scripts/set_docker_tag_meta_data.sh
 
   - label: Build artifacts (master branches only)
-    branches: master
+    branches: staging
     command:
       - .buildkite/scripts/setup_gitconfig.sh
       - eval $(ssh-agent -s)
@@ -48,7 +48,7 @@ steps:
       <<: *docker_plugin_configuration
 
   - label: Build production-track artifacts (master branches only)
-    branches: master
+    branches: staging
     command:
       - .buildkite/scripts/setup_gitconfig.sh
       - eval $(ssh-agent -s)
@@ -67,14 +67,14 @@ steps:
   - wait
 
   - label: Build docker image (master branches only)
-    branches: master
+    branches: staging
     command:
       - .buildkite/scripts/build_tag_push_deployment_image.sh context.tar.gz
     env:
       DEPLOYMENT_VARIANT: testing
 
   - label: Build production-track docker image (master branches only)
-    branches: master
+    branches: staging
     command:
       - .buildkite/scripts/build_tag_push_deployment_image.sh context-prod.tar.gz
 
@@ -89,13 +89,13 @@ steps:
       NOTE: This will NOT deploy the image to any testnet.
 
   - label: Deploy docker image (master branches only)
-    branches: master
+    branches: staging
     command:
       - .buildkite/scripts/promote_deployment_image_to.sh latest-testing
     env:
       DEPLOYMENT_VARIANT: testing
 
   - label: Deploy production-track docker image (master branches only)
-    branches: master
+    branches: staging
     command:
       - .buildkite/scripts/promote_deployment_image_to.sh latest
