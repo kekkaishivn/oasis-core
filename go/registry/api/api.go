@@ -293,6 +293,8 @@ type NodeLookup interface {
 
 	// Returns the node that corresponds to the given committee certificate.
 	NodeByCertificate(cert []byte) (*node.Node, error)
+
+	Nodes() ([]*node.Node, error)
 }
 
 // RuntimeLookup interface implements various ways for the verification
@@ -309,6 +311,9 @@ type RuntimeLookup interface {
 
 	// AnyRuntime looks up either an active or suspended runtime by its identifier and returns it.
 	AnyRuntime(id common.Namespace) (*Runtime, error)
+
+	// AllRuntimes returns a list of all runtimes (including suspended ones).
+	AllRuntimes() ([]*Runtime, error)
 }
 
 // VerifyRegisterEntityArgs verifies arguments for RegisterEntity.
