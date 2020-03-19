@@ -53,7 +53,7 @@ or doesn't reach min_threshold.<metric>.{avg|max}_ratio, ba exits with error cod
 		"du": &Metric{
 			getter:               getDiskUsage,
 			maxThresholdAvgRatio: 1.06,
-			maxThresholdMaxRatio: 1.06,
+			maxThresholdMaxRatio: 1.15,
 		},
 		"io": &Metric{
 			getter:               getIOWork,
@@ -182,7 +182,8 @@ func getSummableMetric(ctx context.Context, metric string, test string, bi *mode
 	query := fmt.Sprintf("sum by (run) (%s %s)", metric, labels.String())
 
 	// Fetch value at last recorded time. Some metrics might not be available anymore, if prometheus was shut down.
-	t := bi.Values[len(bi.Values)-1].Timestamp.Time()
+	// Add one additional minute to capture reported values within the last minute period.
+	t := bi.Values[len(bi.Values)-1].Timestamp.Time().Add(time.Minute)
 
 	result, warnings, err := v1api.Query(ctx, query, t)
 	if err != nil {
@@ -385,15 +386,21 @@ func RegisterBaCmd(parentCmd *cobra.Command) {
 		cmpFlags.Float64Var(&allMetrics[k].minThresholdAvgRatio, fmt.Sprintf("min_threshold.%s.avg_ratio", k), allMetrics[k].minThresholdAvgRatio, fmt.Sprintf("minimum required ratio between average %s metrics", k))
 		cmpFlags.Float64Var(&allMetrics[k].minThresholdMaxRatio, fmt.Sprintf("min_threshold.%s.max_ratio", k), allMetrics[k].minThresholdMaxRatio, fmt.Sprintf("minimum required ratio between maximum %s metrics", k))
 	}
+	cmpFlags.StringSliceVarP(&userMetrics, cfgMetrics, cfgMetricsP, metricNames, "metrics to compare")
 
 	cmpFlags.String(cfgMetricsSourceGitBranch, "", "(optional) git_branch label for the source benchmark instance")
 	cmpFlags.String(cfgMetricsTargetGitBranch, "", "(optional) git_branch label for the target benchmark instance")
-	cmpFlags.StringSliceP(testCmd.CfgTest, testCmd.CfgTestP, nil, "name of e2e test(s) to process")
-	cmpFlags.StringSliceVarP(&userMetrics, cfgMetrics, cfgMetricsP, metricNames, "metrics to compare")
-	_ = viper.BindPFlags(cmpFlags)
 
+	// Register all default scenarios and add tests names.
+	testCmd.RegisterDefaultScenarios()
+	var tests []string
+	for n := range testCmd.Scenarios {
+		tests = append(tests, n)
+	}
+	cmpFlags.StringSliceP(testCmd.CfgTest, testCmd.CfgTestP, tests, "name of e2e test(s) to process")
+
+	_ = viper.BindPFlags(cmpFlags)
 	cmpCmd.Flags().AddFlagSet(cmpFlags)
-	_ = cmpCmd.MarkFlagRequired(testCmd.CfgTest)
 
 	parentCmd.AddCommand(cmpCmd)
 }

@@ -27,6 +27,8 @@ import (
 	"github.com/oasislabs/oasis-core/go/oasis-test-runner/env"
 	"github.com/oasislabs/oasis-core/go/oasis-test-runner/oasis"
 	"github.com/oasislabs/oasis-core/go/oasis-test-runner/scenario"
+	"github.com/oasislabs/oasis-core/go/oasis-test-runner/scenario/e2e"
+	"github.com/oasislabs/oasis-core/go/oasis-test-runner/scenario/remotesigner"
 )
 
 const (
@@ -60,9 +62,8 @@ var (
 	cfgFile string
 	numRuns int
 
-	scenarioMap      = make(map[string]scenario.Scenario)
+	Scenarios        = make(map[string]scenario.Scenario)
 	defaultScenarios []scenario.Scenario
-	scenarios        []scenario.Scenario
 
 	// oasis-test-runner-specific metrics.
 	upGauge = prometheus.NewGauge(
@@ -99,12 +100,11 @@ func Execute() {
 // RegisterNondefault adds a scenario to the runner.
 func RegisterNondefault(s scenario.Scenario) error {
 	n := strings.ToLower(s.Name())
-	if _, ok := scenarioMap[n]; ok {
+	if _, ok := Scenarios[n]; ok {
 		return errors.New("root: scenario already registered: " + n)
 	}
 
-	scenarioMap[n] = s
-	scenarios = append(scenarios, s)
+	Scenarios[n] = s
 
 	params := s.Parameters()
 	if len(params) > 0 {
@@ -216,6 +216,71 @@ func computeParamSets(zp map[string][]string, ps map[string]string) []map[string
 	return rps
 }
 
+// RegisterDefaultScenarios registers all available default scenarios and returns any errors encountered.
+func RegisterDefaultScenarios() (ers []error) {
+	var errors []error
+	// Basic test.
+	errors = append(errors, Register(e2e.Basic))
+	errors = append(errors, Register(e2e.BasicEncryption))
+	// Byzantine executor node.
+	errors = append(errors, Register(e2e.ByzantineExecutorHonest))
+	errors = append(errors, Register(e2e.ByzantineExecutorWrong))
+	errors = append(errors, Register(e2e.ByzantineExecutorStraggler))
+	// Byzantine merge node.
+	errors = append(errors, Register(e2e.ByzantineMergeHonest))
+	errors = append(errors, Register(e2e.ByzantineMergeWrong))
+	errors = append(errors, Register(e2e.ByzantineMergeStraggler))
+	// Storage sync test.
+	errors = append(errors, Register(e2e.StorageSync))
+	// Sentry test.
+	errors = append(errors, Register(e2e.Sentry))
+	errors = append(errors, Register(e2e.SentryEncryption))
+	// Keymanager restart test.
+	errors = append(errors, Register(e2e.KeymanagerRestart))
+	// Dump/restore test.
+	errors = append(errors, Register(e2e.DumpRestore))
+	// Halt test.
+	errors = append(errors, Register(e2e.HaltRestore))
+	// Multiple runtimes test.
+	errors = append(errors, Register(e2e.MultipleRuntimes))
+	// Registry CLI test.
+	errors = append(errors, Register(e2e.RegistryCLI))
+	// Stake CLI test.
+	errors = append(errors, Register(e2e.StakeCLI))
+	// Node shutdown test.
+	errors = append(errors, Register(e2e.NodeShutdown))
+	// Gas fees tests.
+	errors = append(errors, Register(e2e.GasFeesStaking))
+	errors = append(errors, Register(e2e.GasFeesStakingDumpRestore))
+	errors = append(errors, Register(e2e.GasFeesRuntimes))
+	// Identity CLI test.
+	errors = append(errors, Register(e2e.IdentityCLI))
+	// Runtime prune test.
+	errors = append(errors, Register(e2e.RuntimePrune))
+	// Runtime dynamic registration test.
+	errors = append(errors, Register(e2e.RuntimeDynamic))
+	// Transaction source test.
+	errors = append(errors, Register(e2e.TxSourceMultiShort))
+	errors = append(errors, RegisterNondefault(e2e.TxSourceMulti))
+	// Node upgrade tests.
+	errors = append(errors, Register(e2e.NodeUpgrade))
+	errors = append(errors, Register(e2e.NodeUpgradeCancel))
+	// Debonding entries from genesis test.
+	errors = append(errors, Register(e2e.Debond))
+
+	// Register the remote signer test cases.
+	errors = append(errors, Register(remotesigner.Basic))
+
+	// Filter out nil errors.
+	for _, e := range errors {
+		if e != nil {
+			ers = append(ers, e)
+		}
+	}
+
+	return
+}
+
 // Register adds a scenario to the runner and the default scenarios list.
 func Register(scenario scenario.Scenario) error {
 	if err := RegisterNondefault(scenario); err != nil {
@@ -293,7 +358,7 @@ func runRoot(cmd *cobra.Command, args []string) error {
 		toRun = nil
 		for _, v := range vec {
 			n := strings.ToLower(v)
-			scenario, ok := scenarioMap[v]
+			scenario, ok := Scenarios[v]
 			if !ok {
 				logger.Error("unknown test case",
 					"test", n,
@@ -480,20 +545,22 @@ func doCleanup(childEnv *env.Env) (err error) {
 }
 
 func runList(cmd *cobra.Command, args []string) {
-	switch len(scenarios) {
+	switch len(Scenarios) {
 	case 0:
 		fmt.Printf("No supported test cases!\n")
 	default:
 		fmt.Printf("Supported test cases:\n")
 
 		// Sort scenarios alphabetically before printing.
-		sort.Slice(scenarios, func(i, j int) bool {
-			return scenarios[i].Name() < scenarios[j].Name()
-		})
+		var scenarioNames []string
+		for name := range Scenarios {
+			scenarioNames = append(scenarioNames, name)
+		}
+		sort.Strings(scenarioNames)
 
-		for _, v := range scenarios {
-			fmt.Printf("  * %v", v.Name())
-			params := v.Parameters()
+		for _, n := range scenarioNames {
+			fmt.Printf("  * %v", n)
+			params := Scenarios[n].Parameters()
 			if len(params) > 0 {
 				fmt.Printf(" (parameters:")
 				for p := range params {
