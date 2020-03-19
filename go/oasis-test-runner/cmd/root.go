@@ -393,11 +393,12 @@ func runRoot(cmd *cobra.Command, args []string) error {
 		for name, sc := range toRunExploded {
 			for i, v := range sc {
 				// Maintain unique scenario datadir.
-				n := fmt.Sprintf("%s/%d", name, run*len(sc)+i)
+				runID := run*len(sc) + i
+				n := fmt.Sprintf("%s/%d", name, runID)
 
 				if index%parallelJobCount != parallelJobIndex {
 					logger.Info("skipping test case (assigned to different parallel job)",
-						"test", n,
+						"test", name, "run_id", runID,
 					)
 					index++
 					continue
@@ -405,14 +406,14 @@ func runRoot(cmd *cobra.Command, args []string) error {
 
 				if excludeMap[strings.ToLower(v.Name())] {
 					logger.Info("skipping test case (excluded by environment)",
-						"test", n,
+						"test", name, "run_id", runID,
 					)
 					index++
 					continue
 				}
 
 				logger.Info("running test case",
-					"test", n,
+					"test", name, "run_id", runID,
 				)
 
 				childEnv, err := rootEnv.NewChild(n, env.TestInstanceInfo{
@@ -424,7 +425,8 @@ func runRoot(cmd *cobra.Command, args []string) error {
 				if err != nil {
 					logger.Error("failed to setup child environment",
 						"err", err,
-						"test", n,
+						"test", name,
+						"run_id", runID,
 					)
 					return errors.Wrap(err, "root: failed to setup child environment")
 				}
@@ -449,7 +451,8 @@ func runRoot(cmd *cobra.Command, args []string) error {
 				if err = doScenario(childEnv, v); err != nil {
 					logger.Error("failed to run test case",
 						"err", err,
-						"test", n,
+						"test", name,
+						"run_id", runID,
 					)
 					err = errors.Wrap(err, "root: failed to run test case")
 				}
@@ -457,7 +460,8 @@ func runRoot(cmd *cobra.Command, args []string) error {
 				if cleanErr := doCleanup(childEnv); cleanErr != nil {
 					logger.Error("failed to clean up child envionment",
 						"err", cleanErr,
-						"test", n,
+						"test", name,
+						"run_id", runID,
 					)
 					if err == nil {
 						err = errors.Wrap(cleanErr, "root: failed to clean up child enviroment")
@@ -469,7 +473,7 @@ func runRoot(cmd *cobra.Command, args []string) error {
 				}
 
 				logger.Info("passed test case",
-					"test", n,
+					"test", name, "run_id", runID,
 				)
 
 				index++
