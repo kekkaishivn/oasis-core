@@ -46,6 +46,7 @@ var (
 	diskServiceOnce sync.Once
 	memServiceOnce  sync.Once
 	cpuServiceOnce  sync.Once
+	netServiceOnce  sync.Once
 )
 
 // ParseMetricPushLabes is a drop-in replacement for viper.GetStringMapString due to https://github.com/spf13/viper/issues/608.
@@ -95,10 +96,20 @@ type stubService struct {
 	dService *diskService
 	mService *memService
 	cService *cpuService
+	nService *netService
 }
 
 func (s *stubService) Start() error {
 	if err := s.dService.Start(); err != nil {
+		return err
+	}
+	if err := s.mService.Start(); err != nil {
+		return err
+	}
+	if err := s.cService.Start(); err != nil {
+		return err
+	}
+	if err := s.nService.Start(); err != nil {
 		return err
 	}
 
@@ -127,11 +138,17 @@ func newStubService() (service.BackgroundService, error) {
 		return nil, err
 	}
 
+	n, err := NewNetService()
+	if err != nil {
+		return nil, err
+	}
+
 	return &stubService{
 		BaseBackgroundService: svc,
 		dService:              d.(*diskService),
 		mService:              m.(*memService),
 		cService:              c.(*cpuService),
+		nService:              n.(*netService),
 	}, nil
 }
 
@@ -147,6 +164,7 @@ type pullService struct {
 	dService *diskService
 	mService *memService
 	cService *cpuService
+	nService *netService
 }
 
 func (s *pullService) Start() error {
@@ -157,6 +175,9 @@ func (s *pullService) Start() error {
 		return err
 	}
 	if err := s.cService.Start(); err != nil {
+		return err
+	}
+	if err := s.nService.Start(); err != nil {
 		return err
 	}
 
@@ -222,6 +243,11 @@ func newPullService(ctx context.Context) (service.BackgroundService, error) {
 		return nil, err
 	}
 
+	n, err := NewNetService()
+	if err != nil {
+		return nil, err
+	}
+
 	return &pullService{
 		BaseBackgroundService: svc,
 		ctx:                   ctx,
@@ -231,6 +257,7 @@ func newPullService(ctx context.Context) (service.BackgroundService, error) {
 		dService:              d.(*diskService),
 		mService:              m.(*memService),
 		cService:              c.(*cpuService),
+		nService:              n.(*netService),
 	}, nil
 }
 
@@ -243,6 +270,7 @@ type pushService struct {
 	dService *diskService
 	mService *memService
 	cService *cpuService
+	nService *netService
 }
 
 func (s *pushService) Start() error {
@@ -253,6 +281,9 @@ func (s *pushService) Start() error {
 		return err
 	}
 	if err := s.cService.Start(); err != nil {
+		return err
+	}
+	if err := s.nService.Start(); err != nil {
 		return err
 	}
 
@@ -324,6 +355,11 @@ func newPushService() (service.BackgroundService, error) {
 		return nil, err
 	}
 
+	n, err := NewNetService()
+	if err != nil {
+		return nil, err
+	}
+
 	return &pushService{
 		BaseBackgroundService: svc,
 		pusher:                pusher,
@@ -331,6 +367,7 @@ func newPushService() (service.BackgroundService, error) {
 		dService:              d.(*diskService),
 		mService:              m.(*memService),
 		cService:              c.(*cpuService),
+		nService:              n.(*netService),
 	}, nil
 }
 
@@ -683,6 +720,134 @@ func NewCPUService() (service.BackgroundService, error) {
 	})
 
 	return cs, nil
+}
+
+type netService struct {
+	service.BaseBackgroundService
+	sync.Mutex
+
+	// TODO: Should we monitor memory of children PIDs as well?
+	pid      int
+	interval time.Duration
+
+	ReceiveBytesGauge    map[string]prometheus.Gauge
+	ReceivePacketsGauge  map[string]prometheus.Gauge
+	TransmitBytesGauge   map[string]prometheus.Gauge
+	TransmitPacketsGauge map[string]prometheus.Gauge
+}
+
+func (n *netService) Start() error {
+	go n.worker()
+	return nil
+}
+
+// updateNetwork updates current network interface statistics.
+func (n netService) updateNetwork() error {
+	n.Lock()
+	defer n.Unlock()
+
+	/// Obtain process Network info.
+	netDevs, err := n.getNetDevs()
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("network metric: failed to obtain netDevs object %d", n.pid))
+	}
+
+	for d, netDev := range netDevs {
+		n.ReceiveBytesGauge[d].Set(float64(netDev.RxBytes))
+		n.ReceivePacketsGauge[d].Set(float64(netDev.RxPackets))
+		n.TransmitBytesGauge[d].Set(float64(netDev.TxBytes))
+		n.TransmitPacketsGauge[d].Set(float64(netDev.TxPackets))
+	}
+
+	return nil
+}
+
+func (n *netService) worker() {
+	t := time.NewTicker(n.interval)
+	defer t.Stop()
+
+	for {
+		select {
+		case <-n.Quit():
+			break
+		case <-t.C:
+		}
+
+		if err := n.updateNetwork(); err != nil {
+			n.Logger.Warn(err.Error())
+		}
+	}
+}
+
+// getNetDevs returns network interface name -> interface information map.
+func (n *netService) getNetDevs() (map[string]procfs.NetDevLine, error) {
+	/// Obtain process Network info.
+	proc, err := procfs.NewProc(n.pid)
+	if err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("memory metric: failed to obtain proc object for PID %d", n.pid))
+	}
+	netDevs, err := proc.NetDev()
+	if err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("memory metric: failed to obtain netDevs object %d", n.pid))
+	}
+
+	return netDevs, nil
+}
+
+// NewNetService constructs a new network statistics service.
+//
+// This service will read info from /proc/net/dev file every --metric.push.interval
+// seconds.
+func NewNetService() (service.BackgroundService, error) {
+	ns := &netService{
+		BaseBackgroundService: *service.NewBaseBackgroundService("net"),
+		pid:                   os.Getpid(),
+		interval:              viper.GetDuration(CfgMetricsPushInterval),
+		ReceiveBytesGauge:     map[string]prometheus.Gauge{},
+		ReceivePacketsGauge:   map[string]prometheus.Gauge{},
+		TransmitBytesGauge:    map[string]prometheus.Gauge{},
+		TransmitPacketsGauge:  map[string]prometheus.Gauge{},
+	}
+
+	var netCollectors []prometheus.Collector
+	netDevs, err := ns.getNetDevs()
+	if err != nil {
+		return nil, err
+	}
+	for n, _ := range netDevs {
+		ns.ReceiveBytesGauge[n] = prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name: "oasis_worker_net_receive_bytes_total",
+				Help: "Number of received bytes",
+			},
+		)
+		ns.ReceivePacketsGauge[n] = prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name: "oasis_worker_net_receive_packets_total",
+				Help: "Number of received packets",
+			},
+		)
+		ns.TransmitBytesGauge[n] = prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name: "oasis_worker_net_transmit_bytes_total",
+				Help: "Number of transmitted bytes",
+			},
+		)
+		ns.TransmitPacketsGauge[n] = prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name: "oasis_worker_net_transmit_packets_total",
+				Help: "Number of transmitted packets",
+			},
+		)
+
+		netCollectors = append(netCollectors, []prometheus.Collector{ns.ReceiveBytesGauge[n], ns.ReceivePacketsGauge[n], ns.TransmitBytesGauge[n], ns.TransmitPacketsGauge[n]}...)
+	}
+
+	netServiceOnce.Do(func() {
+		prometheus.MustRegister(netCollectors...)
+	})
+
+	return ns, nil
 }
 
 // EscapeLabelCharacters replaces invalid prometheus label name characters with "_".
