@@ -726,14 +726,12 @@ type netService struct {
 	service.BaseBackgroundService
 	sync.Mutex
 
-	// TODO: Should we monitor memory of children PIDs as well?
-	pid      int
 	interval time.Duration
 
-	ReceiveBytesGauge    map[string]prometheus.Gauge
-	ReceivePacketsGauge  map[string]prometheus.Gauge
-	TransmitBytesGauge   map[string]prometheus.Gauge
-	TransmitPacketsGauge map[string]prometheus.Gauge
+	ReceiveBytesGauge    prometheus.Gauge
+	ReceivePacketsGauge  prometheus.Gauge
+	TransmitBytesGauge   prometheus.Gauge
+	TransmitPacketsGauge prometheus.Gauge
 }
 
 func (n *netService) Start() error {
@@ -742,22 +740,31 @@ func (n *netService) Start() error {
 }
 
 // updateNetwork updates current network interface statistics.
-func (n netService) updateNetwork() error {
+func (n *netService) updateNetwork() error {
 	n.Lock()
 	defer n.Unlock()
 
-	/// Obtain process Network info.
-	netDevs, err := n.getNetDevs()
+	// Obtain process Network info.
+	proc, err := procfs.NewDefaultFS()
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("network metric: failed to obtain netDevs object %d", n.pid))
+		return errors.Wrap(err, "network metric: failed to obtain proc object")
+	}
+	netDevs, err := proc.NetDev()
+	if err != nil {
+		return errors.Wrap(err, "network metric: failed to obtain netDevs object")
 	}
 
-	for d, netDev := range netDevs {
-		n.ReceiveBytesGauge[d].Set(float64(netDev.RxBytes))
-		n.ReceivePacketsGauge[d].Set(float64(netDev.RxPackets))
-		n.TransmitBytesGauge[d].Set(float64(netDev.TxBytes))
-		n.TransmitPacketsGauge[d].Set(float64(netDev.TxPackets))
+	rxBytes, rxPackets, txBytes, txPackets := uint64(0), uint64(0), uint64(0), uint64(0)
+	for _, netDev := range netDevs {
+		rxBytes += netDev.RxBytes
+		rxPackets += netDev.RxPackets
+		txBytes += netDev.TxBytes
+		txPackets += netDev.TxPackets
 	}
+	n.ReceiveBytesGauge.Set(float64(rxBytes))
+	n.ReceivePacketsGauge.Set(float64(rxPackets))
+	n.TransmitBytesGauge.Set(float64(txBytes))
+	n.TransmitPacketsGauge.Set(float64(txPackets))
 
 	return nil
 }
@@ -779,21 +786,6 @@ func (n *netService) worker() {
 	}
 }
 
-// getNetDevs returns network interface name -> interface information map.
-func (n *netService) getNetDevs() (map[string]procfs.NetDevLine, error) {
-	/// Obtain process Network info.
-	proc, err := procfs.NewProc(n.pid)
-	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("memory metric: failed to obtain proc object for PID %d", n.pid))
-	}
-	netDevs, err := proc.NetDev()
-	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("memory metric: failed to obtain netDevs object %d", n.pid))
-	}
-
-	return netDevs, nil
-}
-
 // NewNetService constructs a new network statistics service.
 //
 // This service will read info from /proc/net/dev file every --metric.push.interval
@@ -801,47 +793,34 @@ func (n *netService) getNetDevs() (map[string]procfs.NetDevLine, error) {
 func NewNetService() (service.BackgroundService, error) {
 	ns := &netService{
 		BaseBackgroundService: *service.NewBaseBackgroundService("net"),
-		pid:                   os.Getpid(),
 		interval:              viper.GetDuration(CfgMetricsPushInterval),
-		ReceiveBytesGauge:     map[string]prometheus.Gauge{},
-		ReceivePacketsGauge:   map[string]prometheus.Gauge{},
-		TransmitBytesGauge:    map[string]prometheus.Gauge{},
-		TransmitPacketsGauge:  map[string]prometheus.Gauge{},
-	}
-
-	var netCollectors []prometheus.Collector
-	netDevs, err := ns.getNetDevs()
-	if err != nil {
-		return nil, err
-	}
-	for n, _ := range netDevs {
-		ns.ReceiveBytesGauge[n] = prometheus.NewGauge(
+		ReceiveBytesGauge: prometheus.NewGauge(
 			prometheus.GaugeOpts{
 				Name: "oasis_worker_net_receive_bytes_total",
 				Help: "Number of received bytes",
-			},
-		)
-		ns.ReceivePacketsGauge[n] = prometheus.NewGauge(
+			}),
+		ReceivePacketsGauge: prometheus.NewGauge(
 			prometheus.GaugeOpts{
 				Name: "oasis_worker_net_receive_packets_total",
 				Help: "Number of received packets",
-			},
-		)
-		ns.TransmitBytesGauge[n] = prometheus.NewGauge(
+			}),
+		TransmitBytesGauge: prometheus.NewGauge(
 			prometheus.GaugeOpts{
 				Name: "oasis_worker_net_transmit_bytes_total",
 				Help: "Number of transmitted bytes",
-			},
-		)
-		ns.TransmitPacketsGauge[n] = prometheus.NewGauge(
+			}),
+		TransmitPacketsGauge: prometheus.NewGauge(
 			prometheus.GaugeOpts{
 				Name: "oasis_worker_net_transmit_packets_total",
 				Help: "Number of transmitted packets",
-			},
-		)
-
-		netCollectors = append(netCollectors, []prometheus.Collector{ns.ReceiveBytesGauge[n], ns.ReceivePacketsGauge[n], ns.TransmitBytesGauge[n], ns.TransmitPacketsGauge[n]}...)
+			}),
 	}
+
+	netCollectors := []prometheus.Collector{
+		ns.ReceiveBytesGauge,
+		ns.ReceivePacketsGauge,
+		ns.TransmitBytesGauge,
+		ns.TransmitPacketsGauge}
 
 	netServiceOnce.Do(func() {
 		prometheus.MustRegister(netCollectors...)

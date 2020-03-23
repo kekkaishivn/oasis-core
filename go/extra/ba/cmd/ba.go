@@ -3,6 +3,10 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
+	"sort"
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/api"
 	"github.com/prometheus/client_golang/api/prometheus/v1"
@@ -10,9 +14,6 @@ import (
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"os"
-	"sort"
-	"time"
 
 	"github.com/oasislabs/oasis-core/go/common/logging"
 	"github.com/oasislabs/oasis-core/go/oasis-node/cmd/common"
@@ -69,6 +70,12 @@ or doesn't reach min_threshold.<metric>.{avg|max}_ratio, ba exits with error cod
 			getter:               getCPUTime,
 			maxThresholdAvgRatio: 1.05,
 			maxThresholdMaxRatio: 1.05,
+		},
+		"net": &Metric{
+			getter: getNetwork,
+			// Network stats suffer effects from other processes too and varies.
+			maxThresholdAvgRatio: 1.3,
+			maxThresholdMaxRatio: 1.3,
 		},
 	}
 	userMetrics []string
@@ -172,7 +179,7 @@ func getSummableMetric(ctx context.Context, metric string, test string, bi *mode
 	instance := string(bi.Metric[testOasis.MetricsLabelInstance])
 
 	labels := bi.Metric.Clone()
-	// existing job denotes the oasis-test-runner worker. We want to sum disk space across all workers.
+	// Existing job denotes the "oasis-test-runner" worker only. We want to sum disk space across all workers.
 	delete(labels, "job")
 	// We will average metric over all runs.
 	delete(labels, "run")
@@ -208,6 +215,59 @@ func getSummableMetric(ctx context.Context, metric string, test string, bi *mode
 	avg /= float64(len(result.(model.Vector)))
 
 	return avg, max, nil
+}
+
+// getNetwork returns average and maximum amount of received and transmitted bytes for all workers of the given coarse
+// benchmark instance ("up" metric).
+func getNetwork(ctx context.Context, test string, bi *model.SampleStream) (float64, float64, error) {
+	instance := string(bi.Metric[testOasis.MetricsLabelInstance])
+
+	labels := bi.Metric.Clone()
+	// We will group by job to fetch traffic across all workers.
+	delete(labels, "job")
+	// We will average metric over all runs.
+	delete(labels, "run")
+
+	v1api := v1.NewAPI(client)
+	r := v1.Range{
+		Start: bi.Values[0].Timestamp.Time().Add(-1 * time.Minute),
+		End:   bi.Values[len(bi.Values)-1].Timestamp.Time().Add(time.Minute),
+		Step:  time.Second,
+	}
+
+	// We store total network traffic values. Compute the difference.
+	bytesTotalAvg := map[string]float64{}
+	bytesTotalMax := map[string]float64{}
+	for _, rxtx := range []string{"receive", "transmit"} {
+		m := fmt.Sprintf("(oasis_worker_net_%s_bytes_total %s)", rxtx, labels.String())
+		query := fmt.Sprintf("max by (run) %s - min by (run) %s", m, m)
+		result, warnings, err := v1api.QueryRange(ctx, query, r)
+		if err != nil {
+			common.EarlyLogAndExit(errors.Wrap(err, "error querying Prometheus"))
+		}
+		if len(warnings) > 0 {
+			logger.Warn("warnings while querying Prometheus", "warnings", warnings)
+		}
+		if len(result.(model.Matrix)) == 0 {
+			return 0, 0, fmt.Errorf("getNetworkMetric: no time series matched test: %s and instance: %s", test, instance)
+		}
+
+		// Compute average and max values.
+		avg := 0.0
+		max := 0.0
+		for _, s := range result.(model.Matrix) {
+			avg += float64(s.Values[len(s.Values)-1].Value)
+			if max < float64(s.Values[len(s.Values)-1].Value) {
+				max = float64(s.Values[len(s.Values)-1].Value)
+			}
+		}
+		avg /= float64(len(result.(model.Matrix)))
+
+		bytesTotalAvg[rxtx] = avg
+		bytesTotalMax[rxtx] = max
+	}
+
+	return (bytesTotalAvg["receive"] + bytesTotalAvg["transmit"]) / 2.0, (bytesTotalMax["receive"] + bytesTotalMax["transmit"]) / 2.0, nil
 }
 
 // getCoarseBenchmarkInstances finds time series based on "up" metric w/ minute resolution for the given test and gitBranch
