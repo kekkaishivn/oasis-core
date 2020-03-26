@@ -57,7 +57,9 @@ var (
 		Run:   runList,
 	}
 
-	rootFlags = flag.NewFlagSet("", flag.ContinueOnError)
+	rootFlags       = flag.NewFlagSet("", flag.ContinueOnError)
+	TestParamsFlags = flag.NewFlagSet("", flag.ContinueOnError)
+	TestParamsMask  = "params.%s.%s"
 
 	cfgFile string
 	numRuns int
@@ -109,10 +111,11 @@ func RegisterNondefault(s scenario.Scenario) error {
 	params := s.Parameters()
 	if len(params) > 0 {
 		for k, v := range scenario.ParametersToStringMap(params) {
-			// Re-register rootFlags for test parameters.
-			rootFlags.StringSlice("params."+n+"."+k, []string{v}, "")
-			rootCmd.PersistentFlags().AddFlagSet(rootFlags)
-			_ = viper.BindPFlag("params."+n+"."+k, rootFlags.Lookup("params."+n+"."+k))
+			// Populate TestParamsFlags with test parameters and (re-)register it.
+			param := fmt.Sprintf(TestParamsMask, n, k)
+			TestParamsFlags.StringSlice(param, []string{v}, fmt.Sprintf("value(s) of parameter %s for test %s", k, n))
+			rootCmd.PersistentFlags().AddFlagSet(TestParamsFlags)
+			_ = viper.BindPFlag(param, TestParamsFlags.Lookup(param))
 		}
 	}
 
@@ -440,12 +443,18 @@ func runRoot(cmd *cobra.Command, args []string) error {
 				if viper.GetString(metrics.CfgMetricsAddr) != "" {
 					pusher = push.New(viper.GetString(metrics.CfgMetricsAddr), oasis.MetricsJobName)
 					pusher = pusher.
-						Grouping("instance", childEnv.TestInfo().Instance).
-						Grouping("run", strconv.Itoa(childEnv.TestInfo().Run)).
-						Grouping("test", childEnv.TestInfo().Test).
-						Grouping("software_version", version.SoftwareVersion).
-						Grouping("git_branch", version.GitBranch).
-						Gatherer(prometheus.DefaultGatherer)
+						Grouping(oasis.MetricsLabelInstance, childEnv.TestInfo().Instance).
+						Grouping(oasis.MetricsLabelRun, strconv.Itoa(childEnv.TestInfo().Run)).
+						Grouping(oasis.MetricsLabelTest, childEnv.TestInfo().Test).
+						Grouping(oasis.MetricsLabelSoftwareVersion, version.SoftwareVersion).
+						Grouping(oasis.MetricsLabelGitBranch, version.GitBranch)
+
+					// Populate test-provided parameters.
+					for k, v := range childEnv.TestInfo().ParameterSet {
+						pusher = pusher.Grouping(metrics.EscapeLabelCharacters(k), v)
+					}
+
+					pusher = pusher.Gatherer(prometheus.DefaultGatherer)
 				}
 
 				if err = doScenario(childEnv, v); err != nil {

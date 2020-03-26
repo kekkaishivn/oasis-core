@@ -105,7 +105,7 @@ func getDuration(ctx context.Context, test string, bi *model.SampleStream) (floa
 		Step:  time.Second,
 	}
 
-	query := "up" + bi.Metric.String() + " == 1.0"
+	query := fmt.Sprintf("up %s == 1.0", bi.Metric.String())
 	result, warnings, err := v1api.QueryRange(ctx, query, r)
 	if err != nil {
 		common.EarlyLogAndExit(errors.Wrap(err, "error querying Prometheus"))
@@ -277,7 +277,7 @@ func getNetwork(ctx context.Context, test string, bi *model.SampleStream) (float
 // metric afterwards.
 //
 // NB: Due to Prometheus limit, this function fetches time series in the past 183 hours only.
-func getCoarseBenchmarkInstances(ctx context.Context, test string, gitBranch string) (model.Matrix, error) {
+func getCoarseBenchmarkInstances(ctx context.Context, test string, labels map[string]string) (model.Matrix, error) {
 	v1api := v1.NewAPI(client)
 	r := v1.Range{
 		// XXX: Hardcoded max potential number of points in Prometheus is 11,000 which equals ~183 hours with minute resolution.
@@ -286,15 +286,15 @@ func getCoarseBenchmarkInstances(ctx context.Context, test string, gitBranch str
 		Step:  time.Minute,
 	}
 
-	labels := model.LabelSet{
+	ls := model.LabelSet{
 		"job":                      testOasis.MetricsJobName,
 		testOasis.MetricsLabelTest: model.LabelValue(test),
 	}
-	if gitBranch != "" {
-		labels[testOasis.MetricsLabelGitBranch] = model.LabelValue(gitBranch)
+	for k, v := range labels {
+		ls[model.LabelName(k)] = model.LabelValue(v)
 	}
 
-	query := "max(up" + labels.String() + ") by (" + testOasis.MetricsLabelInstance + ") == 1.0"
+	query := fmt.Sprintf("max(up %s) by (%s) == 1.0", ls.String(), testOasis.MetricsLabelInstance)
 	result, warnings, err := v1api.QueryRange(ctx, query, r)
 	if err != nil {
 		logger.Error("error querying Prometheus", "err", err)
@@ -384,13 +384,27 @@ func runCmp(cmd *cobra.Command, args []string) {
 
 	succ := true
 	for _, test := range viper.GetStringSlice(testCmd.CfgTest) {
-		sInstances, err := getCoarseBenchmarkInstances(ctx, test, viper.GetString(cfgMetricsSourceGitBranch))
+		labels := map[string]string{}
+		if viper.IsSet(cfgMetricsSourceGitBranch) {
+			labels[testOasis.MetricsLabelGitBranch] = viper.GetString(cfgMetricsSourceGitBranch)
+		}
+
+		// Query parameter value-specific tests.
+		for k := range testCmd.Scenarios[test].Parameters() {
+			param := fmt.Sprintf(testCmd.TestParamsMask, test, k)
+			if viper.IsSet(param) {
+				// TODO: Check exploded-like parameter sets like we run the tests in oasis-test-runner.
+				labels[metrics.EscapeLabelCharacters(k)] = viper.GetStringSlice(param)[0]
+			}
+		}
+
+		sInstances, err := getCoarseBenchmarkInstances(ctx, test, labels)
 		if err != nil {
 			logger.Error("error querying for source test instances", "err", err)
 			os.Exit(1)
 		}
 		sNames := instanceNames(sInstances)
-		tInstances, err := getCoarseBenchmarkInstances(ctx, test, viper.GetString(cfgMetricsTargetGitBranch))
+		tInstances, err := getCoarseBenchmarkInstances(ctx, test, labels)
 		if err != nil {
 			logger.Error("error querying for target test instances", "err", err)
 			os.Exit(1)
@@ -452,12 +466,18 @@ func RegisterBaCmd(parentCmd *cobra.Command) {
 	cmpFlags.String(cfgMetricsTargetGitBranch, "", "(optional) git_branch label for the target benchmark instance")
 
 	// Register all default scenarios and add tests names.
-	testCmd.RegisterDefaultScenarios()
+	errors := testCmd.RegisterDefaultScenarios()
+	if len(errors) != 0 {
+		fmt.Println(errors)
+	}
 	var tests []string
 	for n := range testCmd.Scenarios {
 		tests = append(tests, n)
 	}
 	cmpFlags.StringSliceP(testCmd.CfgTest, testCmd.CfgTestP, tests, "name of e2e test(s) to process")
+
+	// Also take the test parameter flags.
+	cmpCmd.Flags().AddFlagSet(testCmd.TestParamsFlags)
 
 	_ = viper.BindPFlags(cmpFlags)
 	cmpCmd.Flags().AddFlagSet(cmpFlags)
