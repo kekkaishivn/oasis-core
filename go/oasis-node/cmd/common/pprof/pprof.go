@@ -35,13 +35,13 @@ type pprofService struct {
 	errCh chan error
 }
 
-/// Writes the current process heap to given file with unique suffix.
-func WriteHeap(name string) error {
+/// DumpHeapToFile writes the current process heap to given file with unique suffix.
+func DumpHeapToFile(name string) error {
 	// Find unique filename.
 	var filename string
 	i := 1
 	for {
-		filename = name + ".prof." + strconv.Itoa(i)
+		filename = name + "." + strconv.Itoa(i) + ".pb"
 		if _, err := os.Stat(filename); err != nil {
 			break
 		}

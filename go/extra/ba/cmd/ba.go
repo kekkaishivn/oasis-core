@@ -393,7 +393,7 @@ func runCmp(cmd *cobra.Command, args []string) {
 		for k := range testCmd.Scenarios[test].Parameters() {
 			param := fmt.Sprintf(testCmd.TestParamsMask, test, k)
 			if viper.IsSet(param) {
-				// TODO: Check exploded-like parameter sets like we run the tests in oasis-test-runner.
+				// TODO: We should support all parameter set combinations in the future like we do in oasis-test-runner.
 				labels[metrics.EscapeLabelCharacters(k)] = viper.GetStringSlice(param)[0]
 			}
 		}

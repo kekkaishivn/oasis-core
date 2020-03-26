@@ -3,13 +3,11 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/oasislabs/oasis-core/go/common"
 	"github.com/oasislabs/oasis-core/go/common/logging"
 	epochtime "github.com/oasislabs/oasis-core/go/epochtime/api"
-	"github.com/oasislabs/oasis-core/go/oasis-node/cmd/common/pprof"
 	"github.com/oasislabs/oasis-core/go/oasis-test-runner/env"
 	"github.com/oasislabs/oasis-core/go/oasis-test-runner/oasis"
 	"github.com/oasislabs/oasis-core/go/oasis-test-runner/scenario"
@@ -174,13 +172,9 @@ func (mr *multipleRuntimesImpl) Run(childEnv *env.Env) error {
 					"runtime_id", rt.ID,
 				)
 
-				_ = pprof.WriteHeap("multiple-runtimes.runtime_" + strconv.Itoa(i) + ".beforeSubmitRuntimeTx")
-
 				if err := mr.submitRuntimeTx(ctx, rt.ID, "hello", fmt.Sprintf("world at iteration %d from %s", i, rt.ID)); err != nil {
 					return err
 				}
-
-				_ = pprof.WriteHeap("multiple-runtimes.runtime_" + strconv.Itoa(i) + ".afterSubmitRuntimeTx")
 
 				mr.logger.Info("triggering epoch transition",
 					"epoch", epoch,

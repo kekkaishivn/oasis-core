@@ -3,7 +3,6 @@ package txnscheduler
 import (
 	"context"
 
-	"github.com/oasislabs/oasis-core/go/oasis-node/cmd/common/pprof"
 	"github.com/oasislabs/oasis-core/go/worker/compute/txnscheduler/api"
 )
 
@@ -16,12 +15,9 @@ func (w *Worker) SubmitTx(ctx context.Context, rq *api.SubmitTxRequest) (*api.Su
 		return nil, api.ErrUnknownRuntime
 	}
 
-	rtid, _ := rq.RuntimeID.MarshalText()
-	_ = pprof.WriteHeap("multiple-runtimes.worker_" + string(rtid) + ".beforeSubmitRuntimeTx")
 	if err := runtime.QueueCall(ctx, rq.ExpectedEpochNumber, rq.Data); err != nil {
 		return nil, err
 	}
-	_ = pprof.WriteHeap("multiple-runtimes.worker_" + string(rtid) + ".afterSubmitRuntimeTx")
 
 	return &api.SubmitTxResponse{}, nil
 }
