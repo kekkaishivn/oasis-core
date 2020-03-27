@@ -189,9 +189,12 @@ func parseTestParams(toRun []scenario.Scenario) (map[string][]scenario.Scenario,
 
 // computeParamSets recursively combines a map of string slices into all possible key=>value parameter sets.
 func computeParamSets(zp map[string][]string, ps map[string]string) []map[string]string {
-	// Recursion stops when zp is empty.
+	// Recursion stops when zp is empty. Append ps to result set.
 	if len(zp) == 0 {
-		// XXX: How do I clone a map in golang?
+		if len(ps) == 0 {
+			return []map[string]string{}
+		}
+
 		psCloned := map[string]string{}
 		for k, v := range ps {
 			psCloned[k] = v
@@ -201,19 +204,20 @@ func computeParamSets(zp map[string][]string, ps map[string]string) []map[string
 
 	rps := []map[string]string{}
 
-	// XXX: How do I clone a map in golang?
-	zpCloned := map[string][]string{}
-	for k, v := range zp {
-		zpCloned[k] = v
+	// Take first element from cloned zp and do recursion deterministically.
+	var zpKeys []string
+	for k := range zp {
+		zpKeys = append(zpKeys, k)
 	}
-	// Take first element from cloned zp and do recursion.
-	for k, vals := range zpCloned {
-		delete(zpCloned, k)
-		for _, v := range vals {
-			ps[k] = v
-			rps = append(rps, computeParamSets(zpCloned, ps)...)
-		}
-		break
+	sort.Strings(zpKeys)
+
+	zpCloned := map[string][]string{}
+	for _, k := range zpKeys[1:] {
+		zpCloned[k] = zp[k]
+	}
+	for _, v := range zp[zpKeys[0]] {
+		ps[zpKeys[0]] = v
+		rps = append(rps, computeParamSets(zpCloned, ps)...)
 	}
 
 	return rps
