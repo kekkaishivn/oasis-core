@@ -127,7 +127,7 @@ func (sc *nodeUpgradeImpl) Name() string {
 func (sc *nodeUpgradeImpl) Clone() scenario.Scenario {
 	return &nodeUpgradeImpl{
 		basicImpl: *sc.basicImpl.Clone().(*basicImpl),
-		ctx:       sc.ctx,
+		ctx:       context.Background(),
 	}
 }
 

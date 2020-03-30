@@ -34,7 +34,7 @@ func (ident *identityCLIImpl) Clone() scenario.Scenario {
 	return &identityCLIImpl{
 		nodeBinary: ident.nodeBinary,
 		dataDir:    ident.dataDir,
-		logger:     logging.GetLogger("scenario/e2e/identity-cli"),
+		logger:     ident.logger,
 	}
 }
 

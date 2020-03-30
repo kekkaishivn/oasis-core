@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io/ioutil"
 	"os/exec"
+	"path/filepath"
 	"sync"
 	"syscall"
 	"time"
@@ -184,7 +185,7 @@ func (env *Env) WriteTestInstanceInfo() error {
 	if err != nil {
 		return err
 	}
-	if err = ioutil.WriteFile(env.Dir()+"/test_instance_info.json", b, 0644); err != nil {
+	if err = ioutil.WriteFile(filepath.Join(env.Dir(), "test_instance_info.json"), b, 0644); err != nil {
 		return err
 	}
 

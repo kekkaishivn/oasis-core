@@ -37,7 +37,7 @@ type basicImpl struct {
 
 func (sc *basicImpl) Clone() scenario.Scenario {
 	return &basicImpl{
-		logger: logging.GetLogger("remote-signer/basic"),
+		logger: sc.logger,
 	}
 }
 

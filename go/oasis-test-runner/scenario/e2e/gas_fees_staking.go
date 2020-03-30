@@ -60,7 +60,7 @@ type gasFeesImpl struct {
 
 func (sc *gasFeesImpl) Clone() scenario.Scenario {
 	return &gasFeesImpl{
-		logger: logging.GetLogger("scenario/e2e/gas-fees/staking"),
+		logger: sc.logger,
 	}
 }
 

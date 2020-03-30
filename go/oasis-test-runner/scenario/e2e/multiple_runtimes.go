@@ -48,7 +48,7 @@ type multipleRuntimesImpl struct {
 func (mr *multipleRuntimesImpl) Clone() scenario.Scenario {
 	return &multipleRuntimesImpl{
 		basicImpl: *mr.basicImpl.Clone().(*basicImpl),
-		logger:    logging.GetLogger("scenario/e2e/multiple_runtimes"),
+		logger:    mr.logger,
 
 		numComputeRuntimes:    mr.numComputeRuntimes,
 		numComputeRuntimeTxns: mr.numComputeRuntimeTxns,

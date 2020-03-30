@@ -68,7 +68,7 @@ func (sc *basicImpl) Clone() scenario.Scenario {
 		name:         sc.name,
 		clientBinary: sc.clientBinary,
 		clientArgs:   sc.clientArgs,
-		logger:       logging.GetLogger("scenario/e2e/" + sc.name),
+		logger:       sc.logger,
 	}
 }
 

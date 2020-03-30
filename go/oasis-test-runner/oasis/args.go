@@ -424,12 +424,14 @@ func (args *argBuilder) appendNodeMetrics(node *Node) *argBuilder {
 		"--" + metrics.CfgMetricsMode, metrics.MetricsModePush,
 		"--" + metrics.CfgMetricsAddr, viper.GetString(metrics.CfgMetricsAddr),
 		"--" + metrics.CfgMetricsPushInterval, viper.GetString(metrics.CfgMetricsPushInterval),
-		"--" + metrics.CfgMetricsPushJobName, node.Name}...)
+		"--" + metrics.CfgMetricsPushJobName, node.Name,
+	}...)
 
 	// Append labels.
 	args.vec = append(args.vec, "--"+metrics.CfgMetricsPushLabels)
 	ti := node.net.env.TestInfo()
-	l := []string{MetricsLabelInstance + "=" + ti.Instance,
+	l := []string{
+		MetricsLabelInstance + "=" + ti.Instance,
 		MetricsLabelRun + "=" + strconv.Itoa(ti.Run),
 		MetricsLabelTest + "=" + ti.Test,
 		MetricsLabelSoftwareVersion + "=" + version.SoftwareVersion,

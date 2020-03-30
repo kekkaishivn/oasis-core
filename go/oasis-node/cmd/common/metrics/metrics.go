@@ -539,7 +539,7 @@ func (m *memService) updateMemory() error {
 	m.Lock()
 	defer m.Unlock()
 
-	/// Obtain process Memory info.
+	// Obtain process Memory info.
 	proc, err := procfs.NewProc(m.pid)
 	if err != nil {
 		return fmt.Errorf("memory metric: failed to obtain proc object for PID %d: %v", m.pid, err)
@@ -650,7 +650,7 @@ func (c *cpuService) updateCPU() error {
 	c.Lock()
 	defer c.Unlock()
 
-	/// Obtain process CPU info.
+	// Obtain process CPU info.
 	proc, err := procfs.NewProc(c.pid)
 	if err != nil {
 		return fmt.Errorf("CPU metric: failed to obtain proc object for PID %d: %v", c.pid, err)
