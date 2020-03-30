@@ -1,20 +1,23 @@
 # Staking
 
-The staking component is responsible for managing the staking ledger in the
+The staking service is responsible for managing the staking ledger in the
 consensus layer. It enables operations like transfering tokens between accounts
 and escrowing tokens for specific needs (e.g., operating nodes).
 
-Links:
+The service interface definition lives in [`go/staking/api`]. It defines the
+supported queries and transactions.
 
-* [API definition](../../go/staking/api).
+[`go/staking/api`]: ../../go/staking/api
 
 ## Test Vectors
 
-To generate test vectors for various staking transactions, run:
+To generate test vectors for various staking [transactions], run:
 
 ```bash
 make -C go test-vectors/staking
 ```
+
+[transactions]: transactions.md
 
 ## Accounts
 
@@ -32,7 +35,7 @@ _TODO: Say something about how delegation works._
 
 ## Methods
 
-Each staking method takes a method-specific body as an argument.
+Each staking service method takes a method-specific body as an argument.
 
 ### Transfer
 
