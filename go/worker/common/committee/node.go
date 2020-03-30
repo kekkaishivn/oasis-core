@@ -3,7 +3,6 @@ package committee
 import (
 	"context"
 	"errors"
-	"github.com/prometheus/client_golang/prometheus"
 	"sync"
 
 	"github.com/oasislabs/oasis-core/go/common/identity"
@@ -17,6 +16,7 @@ import (
 	runtimeRegistry "github.com/oasislabs/oasis-core/go/runtime/registry"
 	storage "github.com/oasislabs/oasis-core/go/storage/api"
 	"github.com/oasislabs/oasis-core/go/worker/common/p2p"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
@@ -111,7 +111,6 @@ func (n *Node) Name() string {
 // Start starts the service.
 func (n *Node) Start() error {
 	go n.worker()
-
 	return nil
 }
 

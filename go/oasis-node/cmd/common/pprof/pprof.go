@@ -3,6 +3,7 @@ package pprof
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/pprof"
@@ -11,7 +12,6 @@ import (
 	runtimePprof "runtime/pprof"
 	"strconv"
 
-	"github.com/pkg/errors"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
@@ -35,7 +35,7 @@ type pprofService struct {
 	errCh chan error
 }
 
-/// DumpHeapToFile writes the current process heap to given file with unique suffix.
+// DumpHeapToFile writes the current process heap to given file with unique suffix.
 func DumpHeapToFile(name string) error {
 	// Find unique filename.
 	var filename string
@@ -51,12 +51,12 @@ func DumpHeapToFile(name string) error {
 	// Write memory profiling data.
 	mprof, merr := os.Create(filename)
 	if merr != nil {
-		return errors.Wrap(merr, "failed to create file for memory profiler output")
+		return fmt.Errorf("failed to create file for memory profiler output: %v", merr)
 	}
 	defer mprof.Close()
 	runtime.GC()
 	if merr = runtimePprof.WriteHeapProfile(mprof); merr != nil {
-		return errors.Wrap(merr, "failed to write heap profile")
+		return fmt.Errorf("failed to write heap profile: %v", merr)
 	}
 
 	return nil

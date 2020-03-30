@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+
 	"github.com/oasislabs/oasis-core/go/common"
 	"github.com/oasislabs/oasis-core/go/common/grpc"
 	"github.com/oasislabs/oasis-core/go/common/grpc/policy"

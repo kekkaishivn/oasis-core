@@ -18,7 +18,6 @@ func (w *Worker) SubmitTx(ctx context.Context, rq *api.SubmitTxRequest) (*api.Su
 	if err := runtime.QueueCall(ctx, rq.ExpectedEpochNumber, rq.Data); err != nil {
 		return nil, err
 	}
-
 	return &api.SubmitTxResponse{}, nil
 }
 
