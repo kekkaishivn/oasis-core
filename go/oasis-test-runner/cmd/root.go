@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/push"
 	"github.com/spf13/cobra"
@@ -103,7 +102,7 @@ func Execute() {
 func RegisterNondefault(s scenario.Scenario) error {
 	n := strings.ToLower(s.Name())
 	if _, ok := Scenarios[n]; ok {
-		return errors.New("root: scenario already registered: " + n)
+		return fmt.Errorf("root: scenario already registered: %s", n)
 	}
 
 	Scenarios[n] = s
@@ -172,7 +171,7 @@ func parseTestParams(toRun []scenario.Scenario) (map[string][]scenario.Scenario,
 				case *string:
 					*v = userVal
 				default:
-					return nil, errors.New(fmt.Sprintf("cannot parse parameter. Unknown type %v", v))
+					return nil, fmt.Errorf("cannot parse parameter. Unknown type %T of value %v", v, v)
 				}
 			}
 			r[s.Name()] = append(r[s.Name()], sCloned)
@@ -315,19 +314,19 @@ func initRootEnv(cmd *cobra.Command) (*env.Env, error) {
 
 	var logFmt logging.Format
 	if err := logFmt.Set(viper.GetString(cfgLogFmt)); err != nil {
-		return nil, errors.Wrap(err, "root: failed to set log format")
+		return nil, fmt.Errorf("root: failed to set log format: %v", err)
 	}
 
 	var logLevel logging.Level
 	if err := logLevel.Set(viper.GetString(cfgLogLevel)); err != nil {
-		return nil, errors.Wrap(err, "root: failed to set log level")
+		return nil, fmt.Errorf("root: failed to set log level: %v", err)
 	}
 
 	// Initialize logging.
 	logFile := filepath.Join(env.Dir(), "test-runner.log")
 	w, err := os.OpenFile(logFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
-		return nil, errors.Wrap(err, "root: failed to open log file")
+		return nil, fmt.Errorf("root: failed to open log file: %v", err)
 	}
 
 	var logWriter io.Writer = w
@@ -335,7 +334,7 @@ func initRootEnv(cmd *cobra.Command) (*env.Env, error) {
 		logWriter = io.MultiWriter(os.Stdout, w)
 	}
 	if err := logging.Initialize(logWriter, logFmt, logLevel, nil); err != nil {
-		return nil, errors.Wrap(err, "root: failed to initialize logging")
+		return nil, fmt.Errorf("root: failed to initialize logging: %v", err)
 	}
 
 	ok = true
@@ -370,7 +369,7 @@ func runRoot(cmd *cobra.Command, args []string) error {
 				logger.Error("unknown test case",
 					"test", n,
 				)
-				return errors.New("root: unknown test case: " + n)
+				return fmt.Errorf("root: unknown test case: %s", n)
 			}
 			toRun = append(toRun, scenario)
 		}
@@ -391,7 +390,7 @@ func runRoot(cmd *cobra.Command, args []string) error {
 	var toRunExploded map[string][]scenario.Scenario
 	toRunExploded, err = parseTestParams(toRun)
 	if err != nil {
-		return errors.Wrap(err, "root: failed to parse test params")
+		return fmt.Errorf("root: failed to parse test params: %v", err)
 	}
 
 	// Run all test instances.
@@ -435,7 +434,7 @@ func runRoot(cmd *cobra.Command, args []string) error {
 						"test", name,
 						"run_id", runID,
 					)
-					return errors.Wrap(err, "root: failed to setup child environment")
+					return fmt.Errorf("root: failed to setup child environment: %v", err)
 				}
 
 				// Dump current parameter set to file.
@@ -467,7 +466,7 @@ func runRoot(cmd *cobra.Command, args []string) error {
 						"test", name,
 						"run_id", runID,
 					)
-					err = errors.Wrap(err, "root: failed to run test case")
+					err = fmt.Errorf("root: failed to run test case: %v", err)
 				}
 
 				if cleanErr := doCleanup(childEnv); cleanErr != nil {
@@ -477,7 +476,7 @@ func runRoot(cmd *cobra.Command, args []string) error {
 						"run_id", runID,
 					)
 					if err == nil {
-						err = errors.Wrap(cleanErr, "root: failed to clean up child enviroment")
+						err = fmt.Errorf("root: failed to clean up child enviroment: %v", cleanErr)
 					}
 				}
 
@@ -506,7 +505,7 @@ func doScenario(childEnv *env.Env, sc scenario.Scenario) (err error) {
 
 	var fixture *oasis.NetworkFixture
 	if fixture, err = sc.Fixture(); err != nil {
-		err = errors.Wrap(err, "root: failed to initialize network fixture")
+		err = fmt.Errorf("root: failed to initialize network fixture: %v", err)
 		return
 	}
 
@@ -515,33 +514,33 @@ func doScenario(childEnv *env.Env, sc scenario.Scenario) (err error) {
 	var net *oasis.Network
 	if fixture != nil {
 		if net, err = fixture.Create(childEnv); err != nil {
-			err = errors.Wrap(err, "root: failed to instantiate fixture")
+			err = fmt.Errorf("root: failed to instantiate fixture: %v", err)
 			return
 		}
 	}
 
 	if err = sc.Init(childEnv, net); err != nil {
-		err = errors.Wrap(err, "root: failed to initialize test case")
+		err = fmt.Errorf("root: failed to initialize test case: %v", err)
 		return
 	}
 
 	if pusher != nil {
 		upGauge.Set(1.0)
 		if err = pusher.Push(); err != nil {
-			err = errors.Wrap(err, "root: failed to push metrics")
+			err = fmt.Errorf("root: failed to push metrics: %v", err)
 			return
 		}
 	}
 
 	if err = sc.Run(childEnv); err != nil {
-		err = errors.Wrap(err, "root: failed to run test case")
+		err = fmt.Errorf("root: failed to run test case: %v", err)
 		return
 	}
 
 	if pusher != nil {
 		upGauge.Set(0.0)
 		if err = pusher.Push(); err != nil {
-			err = errors.Wrap(err, "root: failed to push metrics")
+			err = fmt.Errorf("root: failed to push metrics: %v", err)
 			return
 		}
 	}

@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/client_golang/prometheus/push"
@@ -414,13 +413,13 @@ func (d *diskService) updateDiskUsage() error {
 	var duBytes int64
 	err := filepath.Walk(d.dataDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("disk usage metric: failed to access file %s", path))
+			return fmt.Errorf("disk usage metric: failed to access file %s: %v", path, err)
 		}
 		duBytes += info.Size()
 		return nil
 	})
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("disk usage metric: failed to walk directory %s", d.dataDir))
+		return fmt.Errorf("disk usage metric: failed to walk directory %s: %v", d.dataDir, err)
 	}
 	d.diskUsageGauge.Set(float64(duBytes))
 
@@ -435,11 +434,11 @@ func (d *diskService) updateIO() error {
 	// Obtain process I/O info.
 	proc, err := procfs.NewProc(d.pid)
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("disk I/O metric: failed to obtain proc object for PID %d", d.pid))
+		return fmt.Errorf("disk I/O metric: failed to obtain proc object for PID %d: %v", d.pid, err)
 	}
 	procIO, err := proc.IO()
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("disk I/O metric: failed to obtain procIO object %d", d.pid))
+		return fmt.Errorf("disk I/O metric: failed to obtain procIO object %d: %v", d.pid, err)
 	}
 
 	d.diskIOWrittenBytesGauge.Set(float64(procIO.ReadBytes))
@@ -543,11 +542,11 @@ func (m *memService) updateMemory() error {
 	/// Obtain process Memory info.
 	proc, err := procfs.NewProc(m.pid)
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("memory metric: failed to obtain proc object for PID %d", m.pid))
+		return fmt.Errorf("memory metric: failed to obtain proc object for PID %d: %v", m.pid, err)
 	}
 	procStatus, err := proc.NewStatus()
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("memory metric: failed to obtain procStatus object %d", m.pid))
+		return fmt.Errorf("memory metric: failed to obtain procStatus object %d: %v", m.pid, err)
 	}
 
 	m.VmSizeGauge.Set(float64(procStatus.VmSize))
@@ -654,11 +653,11 @@ func (c *cpuService) updateCPU() error {
 	/// Obtain process CPU info.
 	proc, err := procfs.NewProc(c.pid)
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("CPU metric: failed to obtain proc object for PID %d", c.pid))
+		return fmt.Errorf("CPU metric: failed to obtain proc object for PID %d: %v", c.pid, err)
 	}
 	procStat, err := proc.Stat()
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("CPU metric: failed to obtain procStat object %d", c.pid))
+		return fmt.Errorf("CPU metric: failed to obtain procStat object %d: %v", c.pid, err)
 	}
 
 	c.utimeGauge.Set(float64(procStat.UTime) / float64(ClockTicks))
@@ -747,11 +746,11 @@ func (n *netService) updateNetwork() error {
 	// Obtain process Network info.
 	proc, err := procfs.NewDefaultFS()
 	if err != nil {
-		return errors.Wrap(err, "network metric: failed to obtain proc object")
+		return fmt.Errorf("network metric: failed to obtain proc object: %v", err)
 	}
 	netDevs, err := proc.NetDev()
 	if err != nil {
-		return errors.Wrap(err, "network metric: failed to obtain netDevs object")
+		return fmt.Errorf("network metric: failed to obtain netDevs object: %v", err)
 	}
 
 	rxBytes, rxPackets, txBytes, txPackets := uint64(0), uint64(0), uint64(0), uint64(0)

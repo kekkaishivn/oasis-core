@@ -7,7 +7,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/api"
 	"github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
@@ -108,7 +107,7 @@ func getDuration(ctx context.Context, test string, bi *model.SampleStream) (floa
 	query := fmt.Sprintf("up %s == 1.0", bi.Metric.String())
 	result, warnings, err := v1api.QueryRange(ctx, query, r)
 	if err != nil {
-		common.EarlyLogAndExit(errors.Wrap(err, "error querying Prometheus"))
+		common.EarlyLogAndExit(fmt.Errorf("error querying Prometheus: %v", err))
 	}
 	if len(warnings) > 0 {
 		logger.Warn("warnings while querying Prometheus", "warnings", warnings)
@@ -194,7 +193,7 @@ func getSummableMetric(ctx context.Context, metric string, test string, bi *mode
 
 	result, warnings, err := v1api.Query(ctx, query, t)
 	if err != nil {
-		common.EarlyLogAndExit(errors.Wrap(err, "error querying Prometheus"))
+		common.EarlyLogAndExit(fmt.Errorf("error querying Prometheus: %v", err))
 	}
 	if len(warnings) > 0 {
 		logger.Warn("warnings while querying Prometheus", "warnings", warnings)
@@ -243,7 +242,7 @@ func getNetwork(ctx context.Context, test string, bi *model.SampleStream) (float
 		query := fmt.Sprintf("max by (run) %s - min by (run) %s", m, m)
 		result, warnings, err := v1api.QueryRange(ctx, query, r)
 		if err != nil {
-			common.EarlyLogAndExit(errors.Wrap(err, "error querying Prometheus"))
+			common.EarlyLogAndExit(fmt.Errorf("error querying Prometheus: %v", err))
 		}
 		if len(warnings) > 0 {
 			logger.Warn("warnings while querying Prometheus", "warnings", warnings)
