@@ -62,10 +62,6 @@ func (sc *nodeUpgradeCancelImpl) Clone() scenario.Scenario {
 	}
 }
 
-func (sc *nodeUpgradeCancelImpl) Name() string {
-	return "node-upgrade-cancel"
-}
-
 func (sc *nodeUpgradeCancelImpl) Fixture() (*oasis.NetworkFixture, error) {
 	var tee node.TEEHardware
 	err := tee.FromString(viper.GetString(cfgTEEHardware))

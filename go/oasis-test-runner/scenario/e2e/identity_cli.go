@@ -43,7 +43,7 @@ func (ident *identityCLIImpl) Name() string {
 }
 
 func (ident *identityCLIImpl) Parameters() map[string]interface{} {
-	return NoParameters
+	return nil
 }
 
 func (ident *identityCLIImpl) Init(childEnv *env.Env, net *oasis.Network) error {

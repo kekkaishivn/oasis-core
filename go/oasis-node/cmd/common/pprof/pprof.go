@@ -4,16 +4,15 @@ package pprof
 import (
 	"context"
 	"fmt"
+	flag "github.com/spf13/pflag"
+	"github.com/spf13/viper"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/pprof"
 	"os"
 	"runtime"
 	runtimePprof "runtime/pprof"
-	"strconv"
-
-	flag "github.com/spf13/pflag"
-	"github.com/spf13/viper"
 
 	"github.com/oasislabs/oasis-core/go/common/service"
 )
@@ -38,22 +37,17 @@ type pprofService struct {
 // DumpHeapToFile writes the current process heap to given file with unique suffix.
 func DumpHeapToFile(name string) error {
 	// Find unique filename.
-	var filename string
-	i := 1
-	for {
-		filename = name + "." + strconv.Itoa(i) + ".pb"
-		if _, err := os.Stat(filename); err != nil {
-			break
-		}
-		i++
+	wd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to determine current working directory for memory profiler output: %v", err)
 	}
-
-	// Write memory profiling data.
-	mprof, merr := os.Create(filename)
+	mprof, merr := ioutil.TempFile(wd, name+".*.pb")
 	if merr != nil {
 		return fmt.Errorf("failed to create file for memory profiler output: %v", merr)
 	}
 	defer mprof.Close()
+
+	// Write memory profiling data.
 	runtime.GC()
 	if merr = runtimePprof.WriteHeapProfile(mprof); merr != nil {
 		return fmt.Errorf("failed to write heap profile: %v", merr)

@@ -60,16 +60,14 @@ type gasFeesImpl struct {
 
 func (sc *gasFeesImpl) Clone() scenario.Scenario {
 	return &gasFeesImpl{
-		logger: sc.logger,
+		basicImpl:   *sc.basicImpl.Clone().(*basicImpl),
+		logger:      sc.logger,
+		dumpRestore: sc.dumpRestore,
 	}
 }
 
-func (sc *gasFeesImpl) Name() string {
-	return "gas-fees/staking"
-}
-
 func (sc *gasFeesImpl) Parameters() map[string]interface{} {
-	return NoParameters
+	return nil
 }
 
 func (sc *gasFeesImpl) Fixture() (*oasis.NetworkFixture, error) {

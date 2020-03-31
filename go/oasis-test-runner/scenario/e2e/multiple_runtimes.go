@@ -57,10 +57,6 @@ func (mr *multipleRuntimesImpl) Clone() scenario.Scenario {
 	}
 }
 
-func (mr *multipleRuntimesImpl) Name() string {
-	return "multiple-runtimes"
-}
-
 func (mr *multipleRuntimesImpl) Parameters() map[string]interface{} {
 	return map[string]interface{}{
 		"num_compute_runtimes":     &mr.numComputeRuntimes,
@@ -71,7 +67,6 @@ func (mr *multipleRuntimesImpl) Parameters() map[string]interface{} {
 }
 
 func (mr *multipleRuntimesImpl) Fixture() (*oasis.NetworkFixture, error) {
-	// Take default fixtures from Basic test.
 	f, err := mr.basicImpl.Fixture()
 	if err != nil {
 		return nil, err

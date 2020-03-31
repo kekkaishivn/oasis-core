@@ -38,9 +38,10 @@ var (
 compares them. By default, the most recent instance (source) is fetched and
 compared to the pre-last (target). If --metrics.{target|source}.git_branch is
 provided, it compares the most recent instances in the corresponding branches.
-cmp compares all metrics provided by -m parameter and computes ratio source/target
-of metric values. If any of the metrics exceeds max_threshold.<metric>.{avg|max}_ratio
-or doesn't reach min_threshold.<metric>.{avg|max}_ratio, ba exits with error code 1.`,
+cmp compares all metrics provided by --metrics parameter and computes ratio
+source/target of metric values. If any of the metrics exceeds
+max_threshold.<metric>.{avg|max}_ratio or doesn't reach
+min_threshold.<metric>.{avg|max}_ratio, ba exits with error code 1.`,
 		Run: runCmp,
 	}
 
@@ -104,7 +105,7 @@ func getDuration(ctx context.Context, test string, bi *model.SampleStream) (floa
 		Step:  time.Second,
 	}
 
-	query := fmt.Sprintf("up %s == 1.0", bi.Metric.String())
+	query := fmt.Sprintf("%s %s == 1.0", testCmd.MetricUp, bi.Metric.String())
 	result, warnings, err := v1api.QueryRange(ctx, query, r)
 	if err != nil {
 		common.EarlyLogAndExit(fmt.Errorf("error querying Prometheus: %v", err))
@@ -133,11 +134,11 @@ func getDuration(ctx context.Context, test string, bi *model.SampleStream) (floa
 // getIOWork returns average and maximum sum of read and written bytes by all workers of the given coarse benchmark
 // instance  ("up" metric).
 func getIOWork(ctx context.Context, test string, bi *model.SampleStream) (float64, float64, error) {
-	readAvg, readMax, err := getSummableMetric(ctx, "oasis_worker_disk_read_bytes", test, bi)
+	readAvg, readMax, err := getSummableMetric(ctx, metrics.MetricDiskReadBytes, test, bi)
 	if err != nil {
 		return 0, 0, err
 	}
-	writtenAvg, writtenMax, err := getSummableMetric(ctx, "oasis_worker_disk_written_bytes", test, bi)
+	writtenAvg, writtenMax, err := getSummableMetric(ctx, metrics.MetricDiskWrittenBytes, test, bi)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -148,23 +149,23 @@ func getIOWork(ctx context.Context, test string, bi *model.SampleStream) (float6
 // getDiskUsage returns average and maximum sum of disk usage for all workers of the given coarse benchmark instance
 // ("up" metric).
 func getDiskUsage(ctx context.Context, test string, bi *model.SampleStream) (float64, float64, error) {
-	return getSummableMetric(ctx, "oasis_worker_disk_usage_bytes", test, bi)
+	return getSummableMetric(ctx, metrics.MetricDiskUsageBytes, test, bi)
 }
 
 // getRssAnonMemory returns average and maximum sum of anonymous resident memory for all workers of the given coarse
 // benchmark instance ("up" metric).
 func getRssAnonMemory(ctx context.Context, test string, bi *model.SampleStream) (float64, float64, error) {
-	return getSummableMetric(ctx, "oasis_worker_mem_RssAnon_bytes", test, bi)
+	return getSummableMetric(ctx, metrics.MetricMemRssAnonBytes, test, bi)
 }
 
 // getCPUTime returns average and maximum sum of utime and stime for all workers of the given coarse benchmark instance
 // ("up" metric).
 func getCPUTime(ctx context.Context, test string, bi *model.SampleStream) (float64, float64, error) {
-	utimeAvg, utimeMax, err := getSummableMetric(ctx, "oasis_worker_cpu_utime_seconds", test, bi)
+	utimeAvg, utimeMax, err := getSummableMetric(ctx, metrics.MetricCPUUTimeSeconds, test, bi)
 	if err != nil {
 		return 0, 0, err
 	}
-	stimeAvg, stimeMax, err := getSummableMetric(ctx, "oasis_worker_cpu_stime_seconds", test, bi)
+	stimeAvg, stimeMax, err := getSummableMetric(ctx, metrics.MetricCPUSTimeSeconds, test, bi)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -216,8 +217,8 @@ func getSummableMetric(ctx context.Context, metric string, test string, bi *mode
 	return avg, max, nil
 }
 
-// getNetwork returns average and maximum amount of received and transmitted bytes for all workers of the given coarse
-// benchmark instance ("up" metric).
+// getNetwork returns average and maximum amount of network activity for all workers of the given coarse benchmark
+// instance ("up" metric).
 func getNetwork(ctx context.Context, test string, bi *model.SampleStream) (float64, float64, error) {
 	instance := string(bi.Metric[testOasis.MetricsLabelInstance])
 
@@ -237,8 +238,8 @@ func getNetwork(ctx context.Context, test string, bi *model.SampleStream) (float
 	// We store total network traffic values. Compute the difference.
 	bytesTotalAvg := map[string]float64{}
 	bytesTotalMax := map[string]float64{}
-	for _, rxtx := range []string{"receive", "transmit"} {
-		m := fmt.Sprintf("(oasis_worker_net_%s_bytes_total %s)", rxtx, labels.String())
+	for _, rxtx := range []string{metrics.MetricNetReceiveBytesTotal, metrics.MetricNetTransmitBytesTotal} {
+		m := fmt.Sprintf("(%s %s)", rxtx, labels.String())
 		query := fmt.Sprintf("max by (run) %s - min by (run) %s", m, m)
 		result, warnings, err := v1api.QueryRange(ctx, query, r)
 		if err != nil {
@@ -266,7 +267,9 @@ func getNetwork(ctx context.Context, test string, bi *model.SampleStream) (float
 		bytesTotalMax[rxtx] = max
 	}
 
-	return (bytesTotalAvg["receive"] + bytesTotalAvg["transmit"]) / 2.0, (bytesTotalMax["receive"] + bytesTotalMax["transmit"]) / 2.0, nil
+	return (bytesTotalAvg[metrics.MetricNetReceiveBytesTotal] + bytesTotalAvg[metrics.MetricNetTransmitBytesTotal]) / 2.0,
+		(bytesTotalMax[metrics.MetricNetReceiveBytesTotal] + bytesTotalMax[metrics.MetricNetTransmitBytesTotal]) / 2.0,
+		nil
 }
 
 // getCoarseBenchmarkInstances finds time series based on "up" metric w/ minute resolution for the given test and gitBranch
@@ -293,7 +296,7 @@ func getCoarseBenchmarkInstances(ctx context.Context, test string, labels map[st
 		ls[model.LabelName(k)] = model.LabelValue(v)
 	}
 
-	query := fmt.Sprintf("max(up %s) by (%s) == 1.0", ls.String(), testOasis.MetricsLabelInstance)
+	query := fmt.Sprintf("max(%s %s) by (%s) == 1.0", testCmd.MetricUp, ls.String(), testOasis.MetricsLabelInstance)
 	result, warnings, err := v1api.QueryRange(ctx, query, r)
 	if err != nil {
 		logger.Error("error querying Prometheus", "err", err)

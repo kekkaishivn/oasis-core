@@ -120,10 +120,6 @@ func newNodeUpgradeImpl() scenario.Scenario {
 	return sc
 }
 
-func (sc *nodeUpgradeImpl) Name() string {
-	return "node-upgrade"
-}
-
 func (sc *nodeUpgradeImpl) Clone() scenario.Scenario {
 	return &nodeUpgradeImpl{
 		basicImpl: *sc.basicImpl.Clone().(*basicImpl),

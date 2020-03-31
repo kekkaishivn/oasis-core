@@ -34,6 +34,20 @@ const (
 	MetricsModePull = "pull"
 	MetricsModePush = "push"
 
+	MetricDiskUsageBytes          = "oasis_worker_disk_usage_bytes"
+	MetricDiskReadBytes           = "oasis_worker_disk_read_bytes"
+	MetricDiskWrittenBytes        = "oasis_worker_disk_written_bytes"
+	MetricMemVmSizeBytes          = "oasis_worker_mem_VmSize_bytes" // nolint: golint
+	MetricMemRssAnonBytes         = "oasis_worker_mem_RssAnon_bytes"
+	MetricMemRssFileBytes         = "oasis_worker_mem_RssFile_bytes"
+	MetricMemRssShmemBytes        = "oasis_worker_mem_RssShmem_bytes"
+	MetricCPUUTimeSeconds         = "oasis_worker_cpu_utime_seconds"
+	MetricCPUSTimeSeconds         = "oasis_worker_cpu_stime_seconds"
+	MetricNetReceiveBytesTotal    = "oasis_worker_net_receive_bytes_total"
+	MetricNetReceivePacketsTotal  = "oasis_worker_net_receive_packets_total"
+	MetricNetTransmitBytesTotal   = "oasis_worker_net_transmit_bytes_total"
+	MetricNetTransmitPacketsTotal = "oasis_worker_net_transmit_packets_total"
+
 	// getconf CLK_TCK
 	ClockTicks = 100
 )
@@ -481,21 +495,21 @@ func NewDiskService() (service.BackgroundService, error) {
 
 		diskUsageGauge: prometheus.NewGauge(
 			prometheus.GaugeOpts{
-				Name: "oasis_worker_disk_usage_bytes",
+				Name: MetricDiskUsageBytes,
 				Help: "Size of datadir of the worker",
 			},
 		),
 
 		diskIOReadBytesGauge: prometheus.NewGauge(
 			prometheus.GaugeOpts{
-				Name: "oasis_worker_disk_read_bytes",
+				Name: MetricDiskReadBytes,
 				Help: "Read bytes by the worker",
 			},
 		),
 
 		diskIOWrittenBytesGauge: prometheus.NewGauge(
 			prometheus.GaugeOpts{
-				Name: "oasis_worker_disk_written_bytes",
+				Name: MetricDiskWrittenBytes,
 				Help: "Written bytes by the worker",
 			},
 		),
@@ -586,28 +600,28 @@ func NewMemService() (service.BackgroundService, error) {
 
 		VmSizeGauge: prometheus.NewGauge(
 			prometheus.GaugeOpts{
-				Name: "oasis_worker_mem_VmSize_bytes",
+				Name: MetricMemVmSizeBytes,
 				Help: "Virtual memory size of worker",
 			},
 		),
 
 		RssAnonGauge: prometheus.NewGauge(
 			prometheus.GaugeOpts{
-				Name: "oasis_worker_mem_RssAnon_bytes",
+				Name: MetricMemRssAnonBytes,
 				Help: "Size of resident anonymous memory of worker",
 			},
 		),
 
 		RssFileGauge: prometheus.NewGauge(
 			prometheus.GaugeOpts{
-				Name: "oasis_worker_mem_RssFile_bytes",
+				Name: MetricMemRssFileBytes,
 				Help: "Size of resident file mappings of worker",
 			},
 		),
 
 		RssShmemGauge: prometheus.NewGauge(
 			prometheus.GaugeOpts{
-				Name: "oasis_worker_mem_RssShmem_bytes",
+				Name: MetricMemRssShmemBytes,
 				Help: "Size of resident shared memory of worker",
 			},
 		),
@@ -695,14 +709,14 @@ func NewCPUService() (service.BackgroundService, error) {
 
 		utimeGauge: prometheus.NewGauge(
 			prometheus.GaugeOpts{
-				Name: "oasis_worker_cpu_utime_seconds",
+				Name: MetricCPUUTimeSeconds,
 				Help: "CPU user time spent by worker",
 			},
 		),
 
 		stimeGauge: prometheus.NewGauge(
 			prometheus.GaugeOpts{
-				Name: "oasis_worker_cpu_stime_seconds",
+				Name: MetricCPUSTimeSeconds,
 				Help: "CPU system time spent by worker",
 			},
 		),
@@ -795,22 +809,22 @@ func NewNetService() (service.BackgroundService, error) {
 		interval:              viper.GetDuration(CfgMetricsPushInterval),
 		ReceiveBytesGauge: prometheus.NewGauge(
 			prometheus.GaugeOpts{
-				Name: "oasis_worker_net_receive_bytes_total",
+				Name: MetricNetReceiveBytesTotal,
 				Help: "Number of received bytes",
 			}),
 		ReceivePacketsGauge: prometheus.NewGauge(
 			prometheus.GaugeOpts{
-				Name: "oasis_worker_net_receive_packets_total",
+				Name: MetricNetReceivePacketsTotal,
 				Help: "Number of received packets",
 			}),
 		TransmitBytesGauge: prometheus.NewGauge(
 			prometheus.GaugeOpts{
-				Name: "oasis_worker_net_transmit_bytes_total",
+				Name: MetricNetTransmitBytesTotal,
 				Help: "Number of transmitted bytes",
 			}),
 		TransmitPacketsGauge: prometheus.NewGauge(
 			prometheus.GaugeOpts{
-				Name: "oasis_worker_net_transmit_packets_total",
+				Name: MetricNetTransmitPacketsTotal,
 				Help: "Number of transmitted packets",
 			}),
 	}

@@ -33,10 +33,6 @@ func (sc *nodeShutdownImpl) Clone() scenario.Scenario {
 	}
 }
 
-func (sc *nodeShutdownImpl) Name() string {
-	return "node-shutdown"
-}
-
 func (sc *nodeShutdownImpl) Fixture() (*oasis.NetworkFixture, error) {
 	f, err := sc.basicImpl.Fixture()
 	if err != nil {

@@ -77,7 +77,7 @@ func (sc *basicImpl) Name() string {
 }
 
 func (sc *basicImpl) Parameters() map[string]interface{} {
-	return NoParameters
+	return nil
 }
 
 func (sc *basicImpl) Fixture() (*oasis.NetworkFixture, error) {
