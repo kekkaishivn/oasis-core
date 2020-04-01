@@ -26,6 +26,7 @@ const (
 	cfgMetricsP               = "m"
 	cfgMetricsTargetGitBranch = "metrics.target.git_branch"
 	cfgMetricsSourceGitBranch = "metrics.source.git_branch"
+	cfgMetricsNetDevice       = "metrics.net.device"
 )
 
 var (
@@ -108,7 +109,7 @@ func getDuration(ctx context.Context, test string, bi *model.SampleStream) (floa
 	query := fmt.Sprintf("%s %s == 1.0", testCmd.MetricUp, bi.Metric.String())
 	result, warnings, err := v1api.QueryRange(ctx, query, r)
 	if err != nil {
-		common.EarlyLogAndExit(fmt.Errorf("error querying Prometheus: %v", err))
+		common.EarlyLogAndExit(fmt.Errorf("error querying Prometheus: %w", err))
 	}
 	if len(warnings) > 0 {
 		logger.Warn("warnings while querying Prometheus", "warnings", warnings)
@@ -194,7 +195,7 @@ func getSummableMetric(ctx context.Context, metric string, test string, bi *mode
 
 	result, warnings, err := v1api.Query(ctx, query, t)
 	if err != nil {
-		common.EarlyLogAndExit(fmt.Errorf("error querying Prometheus: %v", err))
+		common.EarlyLogAndExit(fmt.Errorf("error querying Prometheus: %w", err))
 	}
 	if len(warnings) > 0 {
 		logger.Warn("warnings while querying Prometheus", "warnings", warnings)
@@ -227,6 +228,8 @@ func getNetwork(ctx context.Context, test string, bi *model.SampleStream) (float
 	delete(labels, "job")
 	// We will average metric over all runs.
 	delete(labels, "run")
+	// We will consider traffic from loopback device only.
+	labels["device"] = model.LabelValue(viper.GetString(cfgMetricsNetDevice))
 
 	v1api := v1.NewAPI(client)
 	r := v1.Range{
@@ -239,11 +242,11 @@ func getNetwork(ctx context.Context, test string, bi *model.SampleStream) (float
 	bytesTotalAvg := map[string]float64{}
 	bytesTotalMax := map[string]float64{}
 	for _, rxtx := range []string{metrics.MetricNetReceiveBytesTotal, metrics.MetricNetTransmitBytesTotal} {
-		m := fmt.Sprintf("(%s %s)", rxtx, labels.String())
-		query := fmt.Sprintf("max by (run) %s - min by (run) %s", m, m)
+		query := fmt.Sprintf("(%s %s)", rxtx, labels.String())
+		fmt.Println(query)
 		result, warnings, err := v1api.QueryRange(ctx, query, r)
 		if err != nil {
-			common.EarlyLogAndExit(fmt.Errorf("error querying Prometheus: %v", err))
+			common.EarlyLogAndExit(fmt.Errorf("error querying Prometheus: %w", err))
 		}
 		if len(warnings) > 0 {
 			logger.Warn("warnings while querying Prometheus", "warnings", warnings)
@@ -256,9 +259,10 @@ func getNetwork(ctx context.Context, test string, bi *model.SampleStream) (float
 		avg := 0.0
 		max := 0.0
 		for _, s := range result.(model.Matrix) {
-			avg += float64(s.Values[len(s.Values)-1].Value)
-			if max < float64(s.Values[len(s.Values)-1].Value) {
-				max = float64(s.Values[len(s.Values)-1].Value)
+			// Network traffic is difference between last and first reading.
+			avg += float64(s.Values[len(s.Values)-1].Value - s.Values[0].Value)
+			if max < float64(s.Values[len(s.Values)-1].Value-s.Values[0].Value) {
+				max = float64(s.Values[len(s.Values)-1].Value - s.Values[0].Value)
 			}
 		}
 		avg /= float64(len(result.(model.Matrix)))
@@ -466,11 +470,12 @@ func RegisterBaCmd(parentCmd *cobra.Command) {
 
 	cmpFlags.String(cfgMetricsSourceGitBranch, "", "(optional) git_branch label for the source benchmark instance")
 	cmpFlags.String(cfgMetricsTargetGitBranch, "", "(optional) git_branch label for the target benchmark instance")
+	cmpFlags.String(cfgMetricsNetDevice, "lo", "network device traffic to compare")
 
 	// Register all default scenarios and add tests names.
-	errors := testCmd.RegisterDefaultScenarios()
-	if len(errors) != 0 {
-		fmt.Println(errors)
+	if err := testCmd.RegisterDefaultScenarios(); err != nil {
+		fmt.Println(err)
+		return
 	}
 	var tests []string
 	for n := range testCmd.Scenarios {

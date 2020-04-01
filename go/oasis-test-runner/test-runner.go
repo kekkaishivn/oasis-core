@@ -2,6 +2,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/oasislabs/oasis-core/go/oasis-test-runner/cmd"
 	"github.com/oasislabs/oasis-core/go/oasis-test-runner/scenario/e2e"
 )
@@ -18,7 +20,10 @@ func main() {
 
 	// Register the e2e test cases.
 	rootCmd.Flags().AddFlagSet(e2e.Flags)
-	_ = cmd.RegisterDefaultScenarios()
+	if err := cmd.RegisterDefaultScenarios(); err != nil {
+		fmt.Println(err)
+		return
+	}
 
 	// Execute the command, now that everything has been initialized.
 	cmd.Execute()
