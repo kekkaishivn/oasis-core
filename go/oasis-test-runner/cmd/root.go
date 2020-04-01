@@ -226,116 +226,61 @@ func computeParamSets(zp map[string][]string, ps map[string]string) []map[string
 
 // RegisterDefaultScenarios registers all available default scenarios and returns any errors encountered.
 func RegisterDefaultScenarios() error {
-	// Basic test.
-	if err := Register(e2e.Basic); err != nil {
-		return err
-	}
-	if err := Register(e2e.BasicEncryption); err != nil {
-		return err
-	}
-	// Byzantine executor node.
-	if err := Register(e2e.ByzantineExecutorHonest); err != nil {
-		return err
-	}
-	if err := Register(e2e.ByzantineExecutorWrong); err != nil {
-		return err
-	}
-	if err := Register(e2e.ByzantineExecutorStraggler); err != nil {
-		return err
-	}
-	// Byzantine merge node.
-	if err := Register(e2e.ByzantineMergeHonest); err != nil {
-		return err
-	}
-	if err := Register(e2e.ByzantineMergeWrong); err != nil {
-		return err
-	}
-	if err := Register(e2e.ByzantineMergeStraggler); err != nil {
-		return err
-	}
-	// Storage sync test.
-	if err := Register(e2e.StorageSync); err != nil {
-		return err
-	}
-	// Sentry test.
-	if err := Register(e2e.Sentry); err != nil {
-		return err
-	}
-	if err := Register(e2e.SentryEncryption); err != nil {
-		return err
-	}
-	// Keymanager restart test.
-	if err := Register(e2e.KeymanagerRestart); err != nil {
-		return err
-	}
-	// Dump/restore test.
-	if err := Register(e2e.DumpRestore); err != nil {
-		return err
-	}
-	// Halt test.
-	if err := Register(e2e.HaltRestore); err != nil {
-		return err
-	}
-	// Multiple runtimes test.
-	if err := Register(e2e.MultipleRuntimes); err != nil {
-		return err
-	}
-	// Registry CLI test.
-	if err := Register(e2e.RegistryCLI); err != nil {
-		return err
-	}
-	// Stake CLI test.
-	if err := Register(e2e.StakeCLI); err != nil {
-		return err
-	}
-	// Node shutdown test.
-	if err := Register(e2e.NodeShutdown); err != nil {
-		return err
-	}
-	// Gas fees tests.
-	if err := Register(e2e.GasFeesStaking); err != nil {
-		return err
-	}
-	if err := Register(e2e.GasFeesStakingDumpRestore); err != nil {
-		return err
-	}
-	if err := Register(e2e.GasFeesRuntimes); err != nil {
-		return err
-	}
-	// Identity CLI test.
-	if err := Register(e2e.IdentityCLI); err != nil {
-		return err
-	}
-	// Runtime prune test.
-	if err := Register(e2e.RuntimePrune); err != nil {
-		return err
-	}
-	// Runtime dynamic registration test.
-	if err := Register(e2e.RuntimeDynamic); err != nil {
-		return err
-	}
-	// Transaction source test.
-	if err := Register(e2e.TxSourceMultiShort); err != nil {
-		return err
-	}
-	if err := RegisterNondefault(e2e.TxSourceMulti); err != nil {
-		return err
-	}
-	// Node upgrade tests.
-	if err := Register(e2e.NodeUpgrade); err != nil {
-		return err
-	}
-	if err := Register(e2e.NodeUpgradeCancel); err != nil {
-		return err
-	}
-	// Debonding entries from genesis test.
-	if err := Register(e2e.Debond); err != nil {
-		return err
-	}
-
-	// Register the remote signer test cases.
-	if err := Register(remotesigner.Basic); err != nil {
-		return err
+	for _, s := range []scenario.Scenario{
+		// Basic test.
+		e2e.Basic,
+		e2e.BasicEncryption,
+		// Byzantine executor node.
+		e2e.ByzantineExecutorHonest,
+		e2e.ByzantineExecutorWrong,
+		e2e.ByzantineExecutorStraggler,
+		// Byzantine merge node.
+		e2e.ByzantineMergeHonest,
+		e2e.ByzantineMergeWrong,
+		e2e.ByzantineMergeStraggler,
+		// Storage sync test.
+		e2e.StorageSync,
+		// Sentry test.
+		e2e.Sentry,
+		e2e.SentryEncryption,
+		// Keymanager restart test.
+		e2e.KeymanagerRestart,
+		// Dump/restore test.
+		e2e.DumpRestore,
+		// Halt test.
+		e2e.HaltRestore,
+		// Multiple runtimes test.
+		e2e.MultipleRuntimes,
+		// Registry CLI test.
+		e2e.RegistryCLI,
+		// Stake CLI test.
+		e2e.StakeCLI,
+		// Node shutdown test.
+		e2e.NodeShutdown,
+		// Gas fees tests.
+		e2e.GasFeesStaking,
+		e2e.GasFeesStakingDumpRestore,
+		e2e.GasFeesRuntimes,
+		// Identity CLI test.
+		e2e.IdentityCLI,
+		// Runtime prune test.
+		e2e.RuntimePrune,
+		// Runtime dynamic registration test.
+		e2e.RuntimeDynamic,
+		// Transaction source test.
+		e2e.TxSourceMultiShort,
+		e2e.TxSourceMulti,
+		// Node upgrade tests.
+		e2e.NodeUpgrade,
+		e2e.NodeUpgradeCancel,
+		// Debonding entries from genesis test.
+		e2e.Debond,
+		// Register the remote signer test cases.
+		remotesigner.Basic,
+	} {
+		if err := Register(s); err != nil {
+			return err
+		}
 	}
 
 	return nil
