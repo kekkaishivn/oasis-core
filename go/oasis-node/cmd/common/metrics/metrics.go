@@ -741,10 +741,10 @@ type netService struct {
 
 	interval time.Duration
 
-	ReceiveBytesGauge    prometheus.Gauge
-	ReceivePacketsGauge  prometheus.Gauge
-	TransmitBytesGauge   prometheus.Gauge
-	TransmitPacketsGauge prometheus.Gauge
+	ReceiveBytesGauge    *prometheus.GaugeVec
+	ReceivePacketsGauge  *prometheus.GaugeVec
+	TransmitBytesGauge   *prometheus.GaugeVec
+	TransmitPacketsGauge *prometheus.GaugeVec
 }
 
 func (n *netService) Start() error {
@@ -767,17 +767,12 @@ func (n *netService) updateNetwork() error {
 		return fmt.Errorf("network metric: failed to obtain netDevs object: %v", err)
 	}
 
-	rxBytes, rxPackets, txBytes, txPackets := uint64(0), uint64(0), uint64(0), uint64(0)
 	for _, netDev := range netDevs {
-		rxBytes += netDev.RxBytes
-		rxPackets += netDev.RxPackets
-		txBytes += netDev.TxBytes
-		txPackets += netDev.TxPackets
+		n.ReceiveBytesGauge.WithLabelValues(netDev.Name).Set(float64(netDev.RxBytes))
+		n.ReceivePacketsGauge.WithLabelValues(netDev.Name).Set(float64(netDev.RxPackets))
+		n.TransmitBytesGauge.WithLabelValues(netDev.Name).Set(float64(netDev.TxBytes))
+		n.TransmitPacketsGauge.WithLabelValues(netDev.Name).Set(float64(netDev.TxPackets))
 	}
-	n.ReceiveBytesGauge.Set(float64(rxBytes))
-	n.ReceivePacketsGauge.Set(float64(rxPackets))
-	n.TransmitBytesGauge.Set(float64(txBytes))
-	n.TransmitPacketsGauge.Set(float64(txPackets))
 
 	return nil
 }
@@ -807,25 +802,41 @@ func NewNetService() (service.BackgroundService, error) {
 	ns := &netService{
 		BaseBackgroundService: *service.NewBaseBackgroundService("net"),
 		interval:              viper.GetDuration(CfgMetricsPushInterval),
-		ReceiveBytesGauge: prometheus.NewGauge(
+		ReceiveBytesGauge: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: MetricNetReceiveBytesTotal,
 				Help: "Number of received bytes",
+			},
+			[]string{
+				// Interface name, e.g. eth0.
+				"device",
 			}),
-		ReceivePacketsGauge: prometheus.NewGauge(
+		ReceivePacketsGauge: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: MetricNetReceivePacketsTotal,
 				Help: "Number of received packets",
+			},
+			[]string{
+				// Interface name, e.g. eth0.
+				"device",
 			}),
-		TransmitBytesGauge: prometheus.NewGauge(
+		TransmitBytesGauge: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: MetricNetTransmitBytesTotal,
 				Help: "Number of transmitted bytes",
+			},
+			[]string{
+				// Interface name, e.g. eth0.
+				"device",
 			}),
-		TransmitPacketsGauge: prometheus.NewGauge(
+		TransmitPacketsGauge: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: MetricNetTransmitPacketsTotal,
 				Help: "Number of transmitted packets",
+			},
+			[]string{
+				// Interface name, e.g. eth0.
+				"device",
 			}),
 	}
 
