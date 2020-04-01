@@ -2,7 +2,6 @@
 package metrics
 
 import (
-	"sync"
 	"time"
 
 	"github.com/spf13/viper"
@@ -19,7 +18,6 @@ type ResourceMicroService interface {
 // resourceService is a base implementation of ResourceMicroService.
 type resourceService struct {
 	service.BaseBackgroundService
-	sync.Mutex
 
 	interval         time.Duration
 	resourceServices []ResourceMicroService

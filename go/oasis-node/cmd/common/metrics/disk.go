@@ -30,7 +30,6 @@ var (
 
 type diskService struct {
 	ResourceMicroService
-	sync.Mutex
 
 	dataDir string
 	// TODO: Should we monitor I/O of children PIDs as well?
@@ -38,9 +37,6 @@ type diskService struct {
 }
 
 func (d *diskService) Update() error {
-	d.Lock()
-	defer d.Unlock()
-
 	// Compute disk usage of datadir.
 	var duBytes int64
 	err := filepath.Walk(d.dataDir, func(path string, info os.FileInfo, err error) error {

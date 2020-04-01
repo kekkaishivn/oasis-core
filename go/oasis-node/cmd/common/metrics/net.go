@@ -26,13 +26,9 @@ var (
 )
 
 type netService struct {
-	sync.Mutex
 }
 
 func (n *netService) Update() error {
-	n.Lock()
-	defer n.Unlock()
-
 	// Obtain process Network info.
 	proc, err := procfs.NewDefaultFS()
 	if err != nil {

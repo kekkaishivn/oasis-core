@@ -27,16 +27,12 @@ var (
 
 type cpuService struct {
 	ResourceMicroService
-	sync.Mutex
 
 	// TODO: Should we monitor memory of children PIDs as well?
 	pid int
 }
 
 func (c *cpuService) Update() error {
-	c.Lock()
-	defer c.Unlock()
-
 	// Obtain process CPU info.
 	proc, err := procfs.NewProc(c.pid)
 	if err != nil {
