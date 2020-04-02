@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
-
 	"github.com/spf13/viper"
 
 	"github.com/oasislabs/oasis-core/go/common/crypto/signature"
@@ -64,10 +63,6 @@ func (sc *gasFeesImpl) Clone() scenario.Scenario {
 		logger:      sc.logger,
 		dumpRestore: sc.dumpRestore,
 	}
-}
-
-func (sc *gasFeesImpl) Parameters() map[string]interface{} {
-	return nil
 }
 
 func (sc *gasFeesImpl) Fixture() (*oasis.NetworkFixture, error) {

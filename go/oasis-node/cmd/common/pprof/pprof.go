@@ -4,8 +4,6 @@ package pprof
 import (
 	"context"
 	"fmt"
-	flag "github.com/spf13/pflag"
-	"github.com/spf13/viper"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -13,6 +11,9 @@ import (
 	"os"
 	"runtime"
 	runtimePprof "runtime/pprof"
+
+	flag "github.com/spf13/pflag"
+	"github.com/spf13/viper"
 
 	"github.com/oasislabs/oasis-core/go/common/service"
 )

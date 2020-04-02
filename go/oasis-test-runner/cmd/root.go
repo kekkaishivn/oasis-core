@@ -109,16 +109,13 @@ func RegisterNondefault(s scenario.Scenario) error {
 
 	Scenarios[n] = s
 
-	params := s.Parameters()
-	if len(params) > 0 {
-		for k, v := range scenario.ParametersToStringMap(params) {
-			// Populate TestParamsFlags with test parameters and (re-)register it.
-			param := fmt.Sprintf(TestParamsMask, n, k)
-			TestParamsFlags.StringSlice(param, []string{v}, fmt.Sprintf("value(s) of parameter %s for test %s", k, n))
-			rootCmd.PersistentFlags().AddFlagSet(TestParamsFlags)
-			_ = viper.BindPFlag(param, TestParamsFlags.Lookup(param))
-		}
-	}
+	s.Parameters().VisitAll(func(f *flag.Flag) {
+		// Populate TestParamsFlags with test parameters and (re-)register it.
+		param := fmt.Sprintf(TestParamsMask, n, f.Name)
+		TestParamsFlags.StringSlice(param, []string{f.Value.String()}, f.Usage)
+		rootCmd.PersistentFlags().AddFlagSet(TestParamsFlags)
+		_ = viper.BindPFlag(param, TestParamsFlags.Lookup(param))
+	})
 
 	return nil
 }
@@ -130,13 +127,13 @@ func parseTestParams(toRun []scenario.Scenario) (map[string][]scenario.Scenario,
 	r := make(map[string][]scenario.Scenario)
 	for _, s := range toRun {
 		zippedParams := make(map[string][]string)
-		for k := range s.Parameters() {
-			userVal := viper.GetStringSlice("params." + s.Name() + "." + k)
+		s.Parameters().VisitAll(func(f *flag.Flag) {
+			userVal := viper.GetStringSlice(fmt.Sprintf(TestParamsMask, s.Name(), f.Name))
 			if userVal == nil {
-				continue
+				return
 			}
-			zippedParams[k] = userVal
-		}
+			zippedParams[f.Name] = userVal
+		})
 
 		parameterSets := computeParamSets(zippedParams, map[string]string{})
 
@@ -144,36 +141,8 @@ func parseTestParams(toRun []scenario.Scenario) (map[string][]scenario.Scenario,
 		for _, ps := range parameterSets {
 			sCloned := s.Clone()
 			for k, userVal := range ps {
-				v := sCloned.Parameters()[k]
-				switch v := v.(type) {
-				case *int:
-					val, err := strconv.ParseInt(userVal, 10, 32)
-					if err != nil {
-						return nil, err
-					}
-					*v = int(val)
-				case *int64:
-					val, err := strconv.ParseInt(userVal, 10, 64)
-					if err != nil {
-						return nil, err
-					}
-					*v = val
-				case *float64:
-					val, err := strconv.ParseFloat(userVal, 64)
-					if err != nil {
-						return nil, err
-					}
-					*v = val
-				case *bool:
-					val, err := strconv.ParseBool(userVal)
-					if err != nil {
-						return nil, err
-					}
-					*v = val
-				case *string:
-					*v = userVal
-				default:
-					return nil, fmt.Errorf("cannot parse parameter. Unknown type %T of value %v", v, v)
+				if err := sCloned.Parameters().Set(k, userVal); err != nil {
+					return nil, fmt.Errorf("parseTestParams: error setting viper parameter: %w", err)
 				}
 			}
 			r[s.Name()] = append(r[s.Name()], sCloned)
@@ -424,7 +393,7 @@ func runRoot(cmd *cobra.Command, args []string) error {
 				childEnv, err := rootEnv.NewChild(n, env.TestInstanceInfo{
 					Test:         v.Name(),
 					Instance:     filepath.Base(rootEnv.Dir()),
-					ParameterSet: scenario.ParametersToStringMap(v.Parameters()),
+					ParameterSet: &env.InfoFlagSet{FlagSet: *v.Parameters()},
 					Run:          run,
 				})
 				if err != nil {
@@ -452,9 +421,9 @@ func runRoot(cmd *cobra.Command, args []string) error {
 						Grouping(oasis.MetricsLabelGitBranch, version.GitBranch)
 
 					// Populate test-provided parameters.
-					for k, v := range childEnv.TestInfo().ParameterSet {
-						pusher = pusher.Grouping(metrics.EscapeLabelCharacters(k), v)
-					}
+					childEnv.TestInfo().ParameterSet.VisitAll(func(f *flag.Flag) {
+						pusher = pusher.Grouping(metrics.EscapeLabelCharacters(f.Name), f.Value.String())
+					})
 
 					pusher = pusher.Gatherer(prometheus.DefaultGatherer)
 				}
@@ -575,12 +544,15 @@ func runList(cmd *cobra.Command, args []string) {
 
 		for _, n := range scenarioNames {
 			fmt.Printf("  * %v", n)
-			params := Scenarios[n].Parameters()
-			if len(params) > 0 {
-				fmt.Printf(" (parameters:")
-				for p := range params {
-					fmt.Printf(" %v", p)
+			var intro bool
+			Scenarios[n].Parameters().VisitAll(func(f *flag.Flag) {
+				if !intro {
+					fmt.Printf(" (parameters:")
+					intro = true
 				}
+				fmt.Printf(" %v", f.Name)
+			})
+			if intro {
 				fmt.Printf(")")
 			}
 			fmt.Printf("\n")

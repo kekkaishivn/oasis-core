@@ -3,6 +3,7 @@ package e2e
 import (
 	"context"
 	"fmt"
+	flag "github.com/spf13/pflag"
 	"os/exec"
 	"path/filepath"
 	"time"
@@ -76,8 +77,8 @@ func (sc *basicImpl) Name() string {
 	return sc.name
 }
 
-func (sc *basicImpl) Parameters() map[string]interface{} {
-	return nil
+func (sc *basicImpl) Parameters() *flag.FlagSet {
+	return flag.NewFlagSet(sc.name, flag.ContinueOnError)
 }
 
 func (sc *basicImpl) Fixture() (*oasis.NetworkFixture, error) {

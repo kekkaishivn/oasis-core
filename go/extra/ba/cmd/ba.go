@@ -395,14 +395,14 @@ func runCmp(cmd *cobra.Command, args []string) {
 			labels[testOasis.MetricsLabelGitBranch] = viper.GetString(cfgMetricsSourceGitBranch)
 		}
 
-		// Query parameter value-specific tests.
-		for k := range testCmd.Scenarios[test].Parameters() {
-			param := fmt.Sprintf(testCmd.TestParamsMask, test, k)
+		// Query parameter value-specific tests only.
+		testCmd.Scenarios[test].Parameters().VisitAll(func(f *flag.Flag) {
+			param := fmt.Sprintf(testCmd.TestParamsMask, test, f.Name)
 			if viper.IsSet(param) {
 				// TODO: We should support all parameter set combinations in the future like we do in oasis-test-runner.
-				labels[metrics.EscapeLabelCharacters(k)] = viper.GetStringSlice(param)[0]
+				labels[metrics.EscapeLabelCharacters(f.Name)] = viper.GetStringSlice(param)[0]
 			}
-		}
+		})
 
 		sInstances, err := getCoarseBenchmarkInstances(ctx, test, labels)
 		if err != nil {

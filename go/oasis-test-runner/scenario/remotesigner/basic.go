@@ -2,6 +2,7 @@ package remotesigner
 
 import (
 	"fmt"
+	flag "github.com/spf13/pflag"
 	"path/filepath"
 	"time"
 
@@ -41,10 +42,11 @@ func (sc *basicImpl) Clone() scenario.Scenario {
 	}
 }
 
-func (sc *basicImpl) Parameters() map[string]interface{} {
-	return map[string]interface{}{
-		"binary": &sc.serverBinary,
-	}
+func (sc *basicImpl) Parameters() *flag.FlagSet {
+	fs := flag.NewFlagSet(sc.Name(), flag.ContinueOnError)
+	fs.StringVar(&sc.serverBinary, "binary", sc.serverBinary, "runtime binary")
+
+	return fs
 }
 
 func (sc *basicImpl) Name() string {

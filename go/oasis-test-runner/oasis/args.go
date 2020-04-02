@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
 	"github.com/oasislabs/oasis-core/go/common"
@@ -440,9 +441,9 @@ func (args *argBuilder) appendNodeMetrics(node *Node) *argBuilder {
 		l = append(l, MetricsLabelGitBranch+"="+version.GitBranch)
 	}
 	// Populate it with test-provided parameters.
-	for k, v := range ti.ParameterSet {
-		l = append(l, metrics.EscapeLabelCharacters(k)+"="+v)
-	}
+	ti.ParameterSet.VisitAll(func(f *flag.Flag) {
+		l = append(l, metrics.EscapeLabelCharacters(f.Name)+"="+f.Value.String())
+	})
 	// Populate it with TEE hardware info.
 	if len(node.net.runtimes) > 0 {
 		l = append(l, MetricsLabelTEEHardware+"="+node.net.runtimes[0].teeHardware.String())

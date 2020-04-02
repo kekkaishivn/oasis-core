@@ -4,6 +4,8 @@ package scenario
 import (
 	"strconv"
 
+	flag "github.com/spf13/pflag"
+
 	"github.com/oasislabs/oasis-core/go/oasis-test-runner/env"
 	"github.com/oasislabs/oasis-core/go/oasis-test-runner/oasis"
 )
@@ -39,11 +41,8 @@ type Scenario interface {
 	// be something suitable for use as a command line argument.
 	Name() string
 
-	// Parameters returns the settable test parameters via CLI.
-	//
-	// The returned map should contain parameter name -> reference to the
-	// variable the parameter value should be stored to.
-	Parameters() map[string]interface{}
+	// Parameters returns the settable test parameters.
+	Parameters() *flag.FlagSet
 
 	// Fixture returns a network fixture to use for this scenario.
 	//

@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"fmt"
+	flag "github.com/spf13/pflag"
 
 	"github.com/spf13/viper"
 
@@ -42,8 +43,8 @@ func (ident *identityCLIImpl) Name() string {
 	return "identity-cli"
 }
 
-func (ident *identityCLIImpl) Parameters() map[string]interface{} {
-	return nil
+func (ident *identityCLIImpl) Parameters() *flag.FlagSet {
+	return flag.NewFlagSet(ident.Name(), flag.ContinueOnError)
 }
 
 func (ident *identityCLIImpl) Init(childEnv *env.Env, net *oasis.Network) error {

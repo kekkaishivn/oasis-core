@@ -11,6 +11,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	flag "github.com/spf13/pflag"
 )
 
 // ErrEarlyTerm is the error passed over the error channel when a
@@ -20,6 +22,10 @@ var ErrEarlyTerm = errors.New("env: sub-process exited early")
 // CleanupFn is the cleanup hook function prototype.
 type CleanupFn func()
 
+type InfoFlagSet struct {
+	flag.FlagSet
+}
+
 // TestInstanceInfo contains information of the current test run.
 type TestInstanceInfo struct {
 	// Test is the name of the test.
@@ -28,11 +34,21 @@ type TestInstanceInfo struct {
 	// Instance is the instance name of the test. e.g. oasis-test-runner123456
 	Instance string `json:"instance"`
 
-	// ParameterSet is the paramater set the test was run with.
-	ParameterSet map[string]string `json:"parameter_set"`
+	// ParameterSet is the parameter set the test was run with.
+	ParameterSet *InfoFlagSet `json:"parameter_set"`
 
 	// Run is the number of run.
 	Run int `json:"run"`
+}
+
+func (ifs *InfoFlagSet) MarshalText() (r []byte, err error) {
+	var ps map[string]string
+	ifs.VisitAll(func(f *flag.Flag) {
+		ps[f.Name] = f.Value.String()
+	})
+
+	r, err = json.Marshal(ps)
+	return
 }
 
 // Env is a (nested) test environment.

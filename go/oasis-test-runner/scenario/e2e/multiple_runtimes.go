@@ -3,6 +3,7 @@ package e2e
 import (
 	"context"
 	"fmt"
+	flag "github.com/spf13/pflag"
 	"time"
 
 	"github.com/oasislabs/oasis-core/go/common"
@@ -57,13 +58,14 @@ func (mr *multipleRuntimesImpl) Clone() scenario.Scenario {
 	}
 }
 
-func (mr *multipleRuntimesImpl) Parameters() map[string]interface{} {
-	return map[string]interface{}{
-		"num_compute_runtimes":     &mr.numComputeRuntimes,
-		"num_compute_runtime_txns": &mr.numComputeRuntimeTxns,
-		"num_compute_workers":      &mr.numComputeWorkers,
-		"executor_group_size":      &mr.executorGroupSize,
-	}
+func (mr *multipleRuntimesImpl) Parameters() *flag.FlagSet {
+	fs := mr.basicImpl.Parameters()
+	fs.IntVar(&mr.numComputeRuntimes, "num_compute_runtimes", mr.numComputeRuntimes, "number of compute runtimes per worker")
+	fs.IntVar(&mr.numComputeRuntimeTxns, "num_compute_runtime_txns", mr.numComputeRuntimeTxns, "number of transactions to perform")
+	fs.IntVar(&mr.numComputeWorkers, "num_compute_workers", mr.numComputeWorkers, "number of workers to initiate")
+	fs.IntVar(&mr.executorGroupSize, "executor_group_size", mr.executorGroupSize, "number of executor workers in committee")
+
+	return fs
 }
 
 func (mr *multipleRuntimesImpl) Fixture() (*oasis.NetworkFixture, error) {
