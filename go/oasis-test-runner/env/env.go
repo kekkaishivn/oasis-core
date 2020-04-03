@@ -42,7 +42,7 @@ type TestInstanceInfo struct {
 }
 
 func (ifs *InfoFlagSet) MarshalText() (r []byte, err error) {
-	var ps map[string]string
+	ps := make(map[string]string)
 	ifs.VisitAll(func(f *flag.Flag) {
 		ps[f.Name] = f.Value.String()
 	})

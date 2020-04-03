@@ -2,33 +2,11 @@
 package scenario
 
 import (
-	"strconv"
-
 	flag "github.com/spf13/pflag"
 
 	"github.com/oasislabs/oasis-core/go/oasis-test-runner/env"
 	"github.com/oasislabs/oasis-core/go/oasis-test-runner/oasis"
 )
-
-// ParametersToStringMap convert scenario-specific key->value parameter set to string->string map.
-func ParametersToStringMap(p map[string]interface{}) map[string]string {
-	sMap := make(map[string]string)
-	for k, v := range p {
-		switch v := v.(type) {
-		case *int:
-			sMap[k] = strconv.Itoa(*v)
-		case *int64:
-			sMap[k] = strconv.FormatInt(*v, 10)
-		case *float64:
-			sMap[k] = strconv.FormatFloat(*v, 'E', -1, 64)
-		case *bool:
-			sMap[k] = strconv.FormatBool(*v)
-		default:
-			sMap[k] = *v.(*string)
-		}
-	}
-	return sMap
-}
 
 // Scenario is a test scenario identified by name.
 type Scenario interface {

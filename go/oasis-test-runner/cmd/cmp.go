@@ -17,7 +17,6 @@ import (
 	"github.com/oasislabs/oasis-core/go/common/logging"
 	"github.com/oasislabs/oasis-core/go/oasis-node/cmd/common"
 	"github.com/oasislabs/oasis-core/go/oasis-node/cmd/common/metrics"
-	testCmd "github.com/oasislabs/oasis-core/go/oasis-test-runner/cmd"
 	testOasis "github.com/oasislabs/oasis-core/go/oasis-test-runner/oasis"
 )
 
@@ -106,7 +105,7 @@ func getDuration(ctx context.Context, test string, bi *model.SampleStream) (floa
 		Step:  time.Second,
 	}
 
-	query := fmt.Sprintf("%s %s == 1.0", testCmd.MetricUp, bi.Metric.String())
+	query := fmt.Sprintf("%s %s == 1.0", MetricUp, bi.Metric.String())
 	result, warnings, err := v1api.QueryRange(ctx, query, r)
 	if err != nil {
 		common.EarlyLogAndExit(fmt.Errorf("error querying Prometheus: %w", err))
@@ -243,7 +242,6 @@ func getNetwork(ctx context.Context, test string, bi *model.SampleStream) (float
 	bytesTotalMax := map[string]float64{}
 	for _, rxtx := range []string{metrics.MetricNetReceiveBytesTotal, metrics.MetricNetTransmitBytesTotal} {
 		query := fmt.Sprintf("(%s %s)", rxtx, labels.String())
-		fmt.Println(query)
 		result, warnings, err := v1api.QueryRange(ctx, query, r)
 		if err != nil {
 			common.EarlyLogAndExit(fmt.Errorf("error querying Prometheus: %w", err))
@@ -300,7 +298,7 @@ func getCoarseBenchmarkInstances(ctx context.Context, test string, labels map[st
 		ls[model.LabelName(k)] = model.LabelValue(v)
 	}
 
-	query := fmt.Sprintf("max(%s %s) by (%s) == 1.0", testCmd.MetricUp, ls.String(), testOasis.MetricsLabelInstance)
+	query := fmt.Sprintf("max(%s %s) by (%s) == 1.0", MetricUp, ls.String(), testOasis.MetricsLabelInstance)
 	result, warnings, err := v1api.QueryRange(ctx, query, r)
 	if err != nil {
 		logger.Error("error querying Prometheus", "err", err)
@@ -389,20 +387,23 @@ func runCmp(cmd *cobra.Command, args []string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 
 	succ := true
-	for _, test := range viper.GetStringSlice(testCmd.CfgTest) {
+	for _, test := range viper.GetStringSlice(CfgTest) {
 		labels := map[string]string{}
 		if viper.IsSet(cfgMetricsSourceGitBranch) {
 			labels[testOasis.MetricsLabelGitBranch] = viper.GetString(cfgMetricsSourceGitBranch)
 		}
 
 		// Query parameter value-specific tests only.
-		testCmd.Scenarios[test].Parameters().VisitAll(func(f *flag.Flag) {
-			param := fmt.Sprintf(testCmd.TestParamsMask, test, f.Name)
-			if viper.IsSet(param) {
-				// TODO: We should support all parameter set combinations in the future like we do in oasis-test-runner.
-				labels[metrics.EscapeLabelCharacters(f.Name)] = viper.GetStringSlice(param)[0]
-			}
-		})
+		s := Scenarios[test]
+		if s != nil {
+			Scenarios[test].Parameters().VisitAll(func(f *flag.Flag) {
+				param := fmt.Sprintf(TestParamsMask, test, f.Name)
+				if viper.IsSet(param) {
+					// TODO: We should support all parameter set combinations in the future like we do in oasis-test-runner.
+					labels[metrics.EscapeLabelCharacters(f.Name)] = viper.GetStringSlice(param)[0]
+				}
+			})
+		}
 
 		sInstances, err := getCoarseBenchmarkInstances(ctx, test, labels)
 		if err != nil {
@@ -456,8 +457,11 @@ func runCmp(cmd *cobra.Command, args []string) {
 	defer cancel()
 }
 
-// Register ba cmd sub-command and all of it's children.
-func RegisterBaCmd(parentCmd *cobra.Command) {
+// Register oasis-test-runner cmp sub-command and all of it's children.
+func RegisterCmpCmd(parentCmd *cobra.Command) {
+	cmpFlags.String(metrics.CfgMetricsAddr, "http://localhost:9090", "Prometheus query address")
+	cmpFlags.StringSliceP(CfgTest, CfgTestP, nil, "test(s) to compare")
+
 	var metricNames []string
 	for k := range allMetrics {
 		metricNames = append(metricNames, k)
@@ -471,20 +475,6 @@ func RegisterBaCmd(parentCmd *cobra.Command) {
 	cmpFlags.String(cfgMetricsSourceGitBranch, "", "(optional) git_branch label for the source benchmark instance")
 	cmpFlags.String(cfgMetricsTargetGitBranch, "", "(optional) git_branch label for the target benchmark instance")
 	cmpFlags.String(cfgMetricsNetDevice, "lo", "network device traffic to compare")
-
-	// Register all default scenarios and add tests names.
-	if err := testCmd.RegisterDefaultScenarios(); err != nil {
-		fmt.Println(err)
-		return
-	}
-	var tests []string
-	for n := range testCmd.Scenarios {
-		tests = append(tests, n)
-	}
-	cmpFlags.StringSliceP(testCmd.CfgTest, testCmd.CfgTestP, tests, "name of e2e test(s) to process")
-
-	// Also take the test parameter flags.
-	cmpCmd.Flags().AddFlagSet(testCmd.TestParamsFlags)
 
 	_ = viper.BindPFlags(cmpFlags)
 	cmpCmd.Flags().AddFlagSet(cmpFlags)

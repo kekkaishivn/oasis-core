@@ -15,7 +15,7 @@ generate:
 
 # Build.
 # List of Go binaries to build.
-go-binaries := oasis-node oasis-test-runner oasis-net-runner oasis-remote-signer extra/stats extra/ba
+go-binaries := oasis-node oasis-test-runner oasis-net-runner oasis-remote-signer extra/stats
 
 $(go-binaries):
 	@$(ECHO) "$(MAGENTA)*** Building $@...$(OFF)"
