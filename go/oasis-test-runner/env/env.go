@@ -41,7 +41,7 @@ type TestInstanceInfo struct {
 	Run int `json:"run"`
 }
 
-func (ifs *InfoFlagSet) MarshalText() (r []byte, err error) {
+func (ifs *InfoFlagSet) MarshalJSON() (r []byte, err error) {
 	ps := make(map[string]string)
 	ifs.VisitAll(func(f *flag.Flag) {
 		ps[f.Name] = f.Value.String()
