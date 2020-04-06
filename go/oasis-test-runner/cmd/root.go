@@ -56,9 +56,8 @@ var (
 		Run:   runList,
 	}
 
-	rootFlags       = flag.NewFlagSet("", flag.ContinueOnError)
-	TestParamsFlags = flag.NewFlagSet("", flag.ContinueOnError)
-	TestParamsMask  = "params.%s.%s"
+	testParamsFlags = flag.NewFlagSet("", flag.ContinueOnError)
+	testParamsMask  = "params.%s.%s"
 
 	cfgFile string
 	numRuns int
@@ -108,11 +107,11 @@ func RegisterNondefault(s scenario.Scenario) error {
 	Scenarios[n] = s
 
 	s.Parameters().VisitAll(func(f *flag.Flag) {
-		// Populate TestParamsFlags with test parameters and (re-)register it.
-		param := fmt.Sprintf(TestParamsMask, n, f.Name)
-		TestParamsFlags.StringSlice(param, []string{f.Value.String()}, f.Usage)
-		rootCmd.PersistentFlags().AddFlagSet(TestParamsFlags)
-		_ = viper.BindPFlag(param, TestParamsFlags.Lookup(param))
+		// Populate testParamsFlags with test parameters and (re-)register it.
+		param := fmt.Sprintf(testParamsMask, n, f.Name)
+		testParamsFlags.StringSlice(param, []string{f.Value.String()}, f.Usage)
+		rootCmd.PersistentFlags().AddFlagSet(testParamsFlags)
+		_ = viper.BindPFlag(param, testParamsFlags.Lookup(param))
 	})
 
 	return nil
@@ -126,7 +125,7 @@ func parseTestParams(toRun []scenario.Scenario) (map[string][]scenario.Scenario,
 	for _, s := range toRun {
 		zippedParams := make(map[string][]string)
 		s.Parameters().VisitAll(func(f *flag.Flag) {
-			userVal := viper.GetStringSlice(fmt.Sprintf(TestParamsMask, s.Name(), f.Name))
+			userVal := viper.GetStringSlice(fmt.Sprintf(testParamsMask, s.Name(), f.Name))
 			if userVal == nil {
 				return
 			}
@@ -500,19 +499,24 @@ func init() {
 	logFmt := logging.FmtLogfmt
 	logLevel := logging.LevelWarn
 
+	// Register persistent flags.
+	persistentFlags := flag.NewFlagSet("", flag.ContinueOnError)
+	persistentFlags.Var(&logFmt, cfgLogFmt, "log format")
+	persistentFlags.Var(&logLevel, cfgLogLevel, "log level")
+	persistentFlags.StringSliceP(CfgTest, CfgTestP, nil, "name of test(s)")
+	persistentFlags.String(metrics.CfgMetricsAddr, "", "Prometheus address")
+	_ = viper.BindPFlags(persistentFlags)
+	rootCmd.PersistentFlags().AddFlagSet(persistentFlags)
+
 	// Register flags.
+	rootFlags := flag.NewFlagSet("", flag.ContinueOnError)
 	rootFlags.StringVar(&cfgFile, cfgConfigFile, "", "config file")
-	rootFlags.Var(&logFmt, cfgLogFmt, "log format")
-	rootFlags.Var(&logLevel, cfgLogLevel, "log level")
 	rootFlags.Bool(cfgLogNoStdout, false, "do not mutiplex logs to stdout")
-	rootFlags.StringSliceP(CfgTest, CfgTestP, nil, "test(s) to run")
-	rootFlags.String(metrics.CfgMetricsAddr, "", "metrics (prometheus) pushgateway address")
-	rootFlags.Duration(metrics.CfgMetricsPushInterval, 5*time.Second, "push interval for node exporter and oasis nodes")
+	rootFlags.Duration(metrics.CfgMetricsPushInterval, 5*time.Second, "metrics push interval for test runner and oasis nodes")
 	rootFlags.IntVarP(&numRuns, cfgNumRuns, "n", 1, "number of runs for given test(s)")
 	rootFlags.Int(cfgParallelJobCount, 1, "(for CI) number of overall parallel jobs")
 	rootFlags.Int(cfgParallelJobIndex, 0, "(for CI) index of this parallel job")
 	_ = viper.BindPFlags(rootFlags)
-
 	rootCmd.Flags().AddFlagSet(rootFlags)
 	rootCmd.Flags().AddFlagSet(env.Flags)
 	rootCmd.AddCommand(listCmd)

@@ -29,8 +29,6 @@ const (
 )
 
 var (
-	cmpFlags = flag.NewFlagSet("", flag.ContinueOnError)
-
 	cmpCmd = &cobra.Command{
 		Use:   "cmp",
 		Short: "compare last two benchmark instances",
@@ -80,8 +78,9 @@ min_threshold.<metric>.{avg|max}_ratio, ba exits with error code 1.`,
 	}
 	userMetrics []string
 
-	logger = logging.GetLogger("cmd/ba")
 	client api.Client
+
+	cmpLogger *logging.Logger
 )
 
 type Metric struct {
@@ -111,7 +110,7 @@ func getDuration(ctx context.Context, test string, bi *model.SampleStream) (floa
 		common.EarlyLogAndExit(fmt.Errorf("error querying Prometheus: %w", err))
 	}
 	if len(warnings) > 0 {
-		logger.Warn("warnings while querying Prometheus", "warnings", warnings)
+		cmpLogger.Warn("warnings while querying Prometheus", "warnings", warnings)
 	}
 	if len(result.(model.Matrix)) == 0 {
 		return 0, 0, fmt.Errorf("getDuration: no time series matched test: %s and instance: %s", test, instance)
@@ -197,7 +196,7 @@ func getSummableMetric(ctx context.Context, metric string, test string, bi *mode
 		common.EarlyLogAndExit(fmt.Errorf("error querying Prometheus: %w", err))
 	}
 	if len(warnings) > 0 {
-		logger.Warn("warnings while querying Prometheus", "warnings", warnings)
+		cmpLogger.Warn("warnings while querying Prometheus", "warnings", warnings)
 	}
 	if len(result.(model.Vector)) == 0 {
 		return 0, 0, fmt.Errorf("getSummableMetric: no time series matched test: %s and instance: %s", test, instance)
@@ -247,7 +246,7 @@ func getNetwork(ctx context.Context, test string, bi *model.SampleStream) (float
 			common.EarlyLogAndExit(fmt.Errorf("error querying Prometheus: %w", err))
 		}
 		if len(warnings) > 0 {
-			logger.Warn("warnings while querying Prometheus", "warnings", warnings)
+			cmpLogger.Warn("warnings while querying Prometheus", "warnings", warnings)
 		}
 		if len(result.(model.Matrix)) == 0 {
 			return 0, 0, fmt.Errorf("getNetworkMetric: no time series matched test: %s and instance: %s", test, instance)
@@ -301,11 +300,11 @@ func getCoarseBenchmarkInstances(ctx context.Context, test string, labels map[st
 	query := fmt.Sprintf("max(%s %s) by (%s) == 1.0", MetricUp, ls.String(), testOasis.MetricsLabelInstance)
 	result, warnings, err := v1api.QueryRange(ctx, query, r)
 	if err != nil {
-		logger.Error("error querying Prometheus", "err", err)
+		cmpLogger.Error("error querying Prometheus", "err", err)
 		os.Exit(1)
 	}
 	if len(warnings) > 0 {
-		logger.Warn("warnings while querying Prometheus", "warnings", warnings)
+		cmpLogger.Warn("warnings while querying Prometheus", "warnings", warnings)
 	}
 
 	// Go through all obtained time series and order them by the timestamp of the first sample.
@@ -338,13 +337,13 @@ func fetchAndCompare(ctx context.Context, m string, test string, sInstance *mode
 
 	sAvg, sMax, err := getMetric(ctx, test, sInstance)
 	if err != nil {
-		logger.Error("error fetching source benchmark instance", "metric", m, "test", test, "instance", instanceName(sInstance), "err", err)
+		cmpLogger.Error("error fetching source benchmark instance", "metric", m, "test", test, "instance", instanceName(sInstance), "err", err)
 		return false
 	}
 
 	tAvg, tMax, err := getMetric(ctx, test, tInstance)
 	if err != nil {
-		logger.Error("error fetching target test instance", "metric", m, "test", test, "instance", instanceName(sInstance), "err", err)
+		cmpLogger.Error("error fetching target test instance", "metric", m, "test", test, "instance", instanceName(sInstance), "err", err)
 		return false
 	}
 
@@ -353,41 +352,72 @@ func fetchAndCompare(ctx context.Context, m string, test string, sInstance *mode
 	maxMaxRatio := allMetrics[m].maxThresholdMaxRatio
 	minAvgRatio := allMetrics[m].minThresholdAvgRatio
 	minMaxRatio := allMetrics[m].minThresholdMaxRatio
-	logger.Info("obtained average ratio", "metric", m, "test", test, "source_avg", sAvg, "target_avg", tAvg, "ratio", sAvg/tAvg)
+	cmpLogger.Info("obtained average ratio", "metric", m, "test", test, "source_avg", sAvg, "target_avg", tAvg, "ratio", sAvg/tAvg)
 	if maxAvgRatio != 0 && sAvg/tAvg > maxAvgRatio {
-		logger.Error("average metric value exceeds max allowed ratio", "metric", m, "test", test, "source_avg", sAvg, "target_avg", tAvg, "ratio", sAvg/tAvg, "max_allowed_avg_ratio", maxAvgRatio)
+		cmpLogger.Error("average metric value exceeds max allowed ratio", "metric", m, "test", test, "source_avg", sAvg, "target_avg", tAvg, "ratio", sAvg/tAvg, "max_allowed_avg_ratio", maxAvgRatio)
 		succ = false
 	}
 	if minAvgRatio != 0 && sAvg/tAvg < minAvgRatio {
-		logger.Error("average metric value doesn't reach min required ratio", "metric", m, "test", test, "source_avg", sAvg, "target_avg", tAvg, "ratio", sAvg/tAvg, "min_required_avg_ratio", minAvgRatio)
+		cmpLogger.Error("average metric value doesn't reach min required ratio", "metric", m, "test", test, "source_avg", sAvg, "target_avg", tAvg, "ratio", sAvg/tAvg, "min_required_avg_ratio", minAvgRatio)
 		succ = false
 	}
-	logger.Info("obtained max ratio", "metric", m, "test", test, "source_max", sMax, "target_max", tMax, "ratio", sMax/tMax)
+	cmpLogger.Info("obtained max ratio", "metric", m, "test", test, "source_max", sMax, "target_max", tMax, "ratio", sMax/tMax)
 	if maxMaxRatio != 0 && sMax/tMax > maxMaxRatio {
-		logger.Error("maximum metric value exceeds max ratio", "metric", m, "test", test, "source_max", sMax, "target_max", tMax, "ratio", sMax/tMax, "max_allowed_max_ratio", maxMaxRatio)
+		cmpLogger.Error("maximum metric value exceeds max ratio", "metric", m, "test", test, "source_max", sMax, "target_max", tMax, "ratio", sMax/tMax, "max_allowed_max_ratio", maxMaxRatio)
 		succ = false
 	}
 	if minMaxRatio != 0 && sMax/tMax < maxMaxRatio {
-		logger.Error("maximum metric value doesn't reach min required ratio", "metric", m, "test", test, "source_max", sMax, "target_max", tMax, "ratio", sMax/tMax, "min_required_max_ratio", maxMaxRatio)
+		cmpLogger.Error("maximum metric value doesn't reach min required ratio", "metric", m, "test", test, "source_max", sMax, "target_max", tMax, "ratio", sMax/tMax, "min_required_max_ratio", maxMaxRatio)
 		succ = false
 	}
 
 	return
 }
 
+func initCmpLogger() error {
+	var logFmt logging.Format
+	if err := logFmt.Set(viper.GetString(cfgLogFmt)); err != nil {
+		return fmt.Errorf("root: failed to set log format: %w", err)
+	}
+
+	var logLevel logging.Level
+	if err := logLevel.Set(viper.GetString(cfgLogLevel)); err != nil {
+		return fmt.Errorf("root: failed to set log level: %w", err)
+	}
+
+	if err := logging.Initialize(os.Stdout, logFmt, logLevel, nil); err != nil {
+		return fmt.Errorf("root: failed to initialize logging: %w", err)
+	}
+
+	cmpLogger = logging.GetLogger("cmd/cmp")
+
+	return nil
+}
+
 func runCmp(cmd *cobra.Command, args []string) {
+	if err := initCmpLogger(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
 	var err error
 	client, err = api.NewClient(api.Config{
 		Address: viper.GetString(metrics.CfgMetricsAddr),
 	})
 	if err != nil {
-		logger.Error("error creating client", "err", err)
+		cmpLogger.Error("error creating client", "err", err)
 		os.Exit(1)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 
+	tests := viper.GetStringSlice(CfgTest)
+	if len(tests) == 0 {
+		for _, s := range defaultScenarios {
+			tests = append(tests, s.Name())
+		}
+	}
 	succ := true
-	for _, test := range viper.GetStringSlice(CfgTest) {
+	for _, test := range tests {
 		labels := map[string]string{}
 		if viper.IsSet(cfgMetricsSourceGitBranch) {
 			labels[testOasis.MetricsLabelGitBranch] = viper.GetString(cfgMetricsSourceGitBranch)
@@ -397,7 +427,7 @@ func runCmp(cmd *cobra.Command, args []string) {
 		s := Scenarios[test]
 		if s != nil {
 			Scenarios[test].Parameters().VisitAll(func(f *flag.Flag) {
-				param := fmt.Sprintf(TestParamsMask, test, f.Name)
+				param := fmt.Sprintf(testParamsMask, test, f.Name)
 				if viper.IsSet(param) {
 					// TODO: We should support all parameter set combinations in the future like we do in oasis-test-runner.
 					labels[metrics.EscapeLabelCharacters(f.Name)] = viper.GetStringSlice(param)[0]
@@ -407,23 +437,23 @@ func runCmp(cmd *cobra.Command, args []string) {
 
 		sInstances, err := getCoarseBenchmarkInstances(ctx, test, labels)
 		if err != nil {
-			logger.Error("error querying for source test instances", "err", err)
+			cmpLogger.Error("error querying for source test instances", "err", err)
 			os.Exit(1)
 		}
 		sNames := instanceNames(sInstances)
 		tInstances, err := getCoarseBenchmarkInstances(ctx, test, labels)
 		if err != nil {
-			logger.Error("error querying for target test instances", "err", err)
+			cmpLogger.Error("error querying for target test instances", "err", err)
 			os.Exit(1)
 		}
 		tNames := instanceNames(tInstances)
 
 		if len(sNames) == 0 {
-			logger.Info("test does not have any source benchmark instances to compare, ignoring", "test", test)
+			cmpLogger.Info("test does not have any source benchmark instances to compare, ignoring", "test", test)
 			continue
 		}
 		if len(tNames) == 0 {
-			logger.Info("test does not have any target benchmark instances to compare, ignoring", "test", test)
+			cmpLogger.Info("test does not have any target benchmark instances to compare, ignoring", "test", test)
 			continue
 		}
 
@@ -435,13 +465,13 @@ func runCmp(cmd *cobra.Command, args []string) {
 		} else {
 			// Last benchmark instances are equal, pick the pre-last one from the target instances.
 			if len(tNames) < 2 {
-				logger.Info("test has only one benchmark instance, ignoring", "test", test, "source_instances", sNames, "target_instances", tNames)
+				cmpLogger.Info("test has only one benchmark instance, ignoring", "test", test, "source_instances", sNames, "target_instances", tNames)
 				continue
 			}
 			sInstance = sInstances[len(sInstances)-1]
 			tInstance = tInstances[len(tInstances)-2]
 		}
-		logger.Info("obtained source and target instance", "test", test, "source_instance", instanceName(sInstance), "target_instance", instanceName(tInstance))
+		cmpLogger.Info("obtained source and target instance", "test", test, "source_instance", instanceName(sInstance), "target_instance", instanceName(tInstance))
 
 		for _, m := range userMetrics {
 			// Don't put succ = succ && f oneliner here, because f won't get executed once succ = false.
@@ -459,8 +489,7 @@ func runCmp(cmd *cobra.Command, args []string) {
 
 // Register oasis-test-runner cmp sub-command and all of it's children.
 func RegisterCmpCmd(parentCmd *cobra.Command) {
-	cmpFlags.String(metrics.CfgMetricsAddr, "http://localhost:9090", "Prometheus query address")
-	cmpFlags.StringSliceP(CfgTest, CfgTestP, nil, "test(s) to compare")
+	cmpFlags := flag.NewFlagSet("", flag.ContinueOnError)
 
 	var metricNames []string
 	for k := range allMetrics {
