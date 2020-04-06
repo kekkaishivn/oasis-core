@@ -28,15 +28,13 @@ var (
 	diskServiceOnce sync.Once
 )
 
-type diskService struct {
-	ResourceMicroService
-
+type diskCollector struct {
 	dataDir string
 	// TODO: Should we monitor I/O of children PIDs as well?
 	pid int
 }
 
-func (d *diskService) Update() error {
+func (d *diskCollector) Update() error {
 	// Compute disk usage of datadir.
 	var duBytes int64
 	err := filepath.Walk(d.dataDir, func(path string, info os.FileInfo, err error) error {
@@ -71,8 +69,8 @@ func (d *diskService) Update() error {
 //
 // This service will compute the size of datadir folder and read I/O info of the process every --metric.push.interval
 // seconds.
-func NewDiskService() ResourceMicroService {
-	ds := &diskService{
+func NewDiskService() ResourceCollector {
+	ds := &diskCollector{
 		dataDir: viper.GetString(common.CfgDataDir),
 		pid:     os.Getpid(),
 	}

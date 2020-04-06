@@ -9,18 +9,18 @@ import (
 	"github.com/oasislabs/oasis-core/go/common/service"
 )
 
-// ResourceMicroService is interface for monitoring resources (cpu, mem, disk, net).
-type ResourceMicroService interface {
+// ResourceCollector is interface for monitoring resources (cpu, mem, disk, net).
+type ResourceCollector interface {
 	// Update updates corresponding resource metrics.
 	Update() error
 }
 
-// resourceService is a base implementation of ResourceMicroService.
+// resourceService updates and collects number of resources.
 type resourceService struct {
 	service.BaseBackgroundService
 
 	interval         time.Duration
-	resourceServices []ResourceMicroService
+	resourceServices []ResourceCollector
 }
 
 func (brs *resourceService) Start() error {
@@ -50,7 +50,7 @@ func newResourceService() *resourceService {
 	rs := &resourceService{
 		BaseBackgroundService: *service.NewBaseBackgroundService("resources_watcher"),
 		interval:              viper.GetDuration(CfgMetricsPushInterval),
-		resourceServices: []ResourceMicroService{
+		resourceServices: []ResourceCollector{
 			NewDiskService(),
 			NewMemService(),
 			NewCPUService(),

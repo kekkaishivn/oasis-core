@@ -25,10 +25,10 @@ var (
 	netServiceOnce sync.Once
 )
 
-type netService struct {
+type netCollector struct {
 }
 
-func (n *netService) Update() error {
+func (n *netCollector) Update() error {
 	// Obtain process Network info.
 	proc, err := procfs.NewDefaultFS()
 	if err != nil {
@@ -53,8 +53,8 @@ func (n *netService) Update() error {
 //
 // This service will read info from /proc/net/dev file every --metric.push.interval
 // seconds.
-func NewNetService() ResourceMicroService {
-	ns := &netService{}
+func NewNetService() ResourceCollector {
+	ns := &netCollector{}
 
 	receiveBytesGauge = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{

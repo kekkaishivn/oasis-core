@@ -18,7 +18,7 @@ const (
 )
 
 var (
-	vmSizeGauge   prometheus.Gauge // nolint: golint
+	vmSizeGauge   prometheus.Gauge
 	rssAnonGauge  prometheus.Gauge
 	rssFileGauge  prometheus.Gauge
 	rssShmemGauge prometheus.Gauge
@@ -26,14 +26,12 @@ var (
 	memServiceOnce sync.Once
 )
 
-type memService struct {
-	ResourceMicroService
-
+type memCollector struct {
 	// TODO: Should we monitor memory of children PIDs as well?
 	pid int
 }
 
-func (m *memService) Update() error {
+func (m *memCollector) Update() error {
 	// Obtain process Memory info.
 	proc, err := procfs.NewProc(m.pid)
 	if err != nil {
@@ -56,8 +54,8 @@ func (m *memService) Update() error {
 //
 // This service will read memory info from process Status file every --metric.push.interval
 // seconds.
-func NewMemService() ResourceMicroService {
-	ms := &memService{
+func NewMemService() ResourceCollector {
+	ms := &memCollector{
 		pid: os.Getpid(),
 	}
 

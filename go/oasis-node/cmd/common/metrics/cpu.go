@@ -25,14 +25,12 @@ var (
 	cpuServiceOnce sync.Once
 )
 
-type cpuService struct {
-	ResourceMicroService
-
+type cpuCollector struct {
 	// TODO: Should we monitor memory of children PIDs as well?
 	pid int
 }
 
-func (c *cpuService) Update() error {
+func (c *cpuCollector) Update() error {
 	// Obtain process CPU info.
 	proc, err := procfs.NewProc(c.pid)
 	if err != nil {
@@ -53,8 +51,8 @@ func (c *cpuService) Update() error {
 //
 // This service will read CPU spent time info from process Stat file every
 // --metric.push.interval seconds.
-func NewCPUService() ResourceMicroService {
-	cs := &cpuService{
+func NewCPUService() ResourceCollector {
+	cs := &cpuCollector{
 		pid: os.Getpid(),
 	}
 
