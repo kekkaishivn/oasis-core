@@ -424,9 +424,9 @@ func runCmp(cmd *cobra.Command, args []string) {
 		}
 
 		// Query parameter value-specific tests only.
-		s := Scenarios[test]
+		s := scenarios[test]
 		if s != nil {
-			Scenarios[test].Parameters().VisitAll(func(f *flag.Flag) {
+			scenarios[test].Parameters().VisitAll(func(f *flag.Flag) {
 				param := fmt.Sprintf(testParamsMask, test, f.Name)
 				if viper.IsSet(param) {
 					// TODO: We should support all parameter set combinations in the future like we do in oasis-test-runner.

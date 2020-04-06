@@ -62,7 +62,7 @@ var (
 	cfgFile string
 	numRuns int
 
-	Scenarios        = make(map[string]scenario.Scenario)
+	scenarios        = make(map[string]scenario.Scenario)
 	defaultScenarios []scenario.Scenario
 
 	// oasis-test-runner-specific metrics.
@@ -100,11 +100,11 @@ func Execute() {
 // RegisterNondefault adds a scenario to the runner.
 func RegisterNondefault(s scenario.Scenario) error {
 	n := strings.ToLower(s.Name())
-	if _, ok := Scenarios[n]; ok {
+	if _, ok := scenarios[n]; ok {
 		return fmt.Errorf("root: scenario already registered: %s", n)
 	}
 
-	Scenarios[n] = s
+	scenarios[n] = s
 
 	s.Parameters().VisitAll(func(f *flag.Flag) {
 		// Populate testParamsFlags with test parameters and (re-)register it.
@@ -267,7 +267,7 @@ func runRoot(cmd *cobra.Command, args []string) error {
 		toRun = nil
 		for _, v := range vec {
 			n := strings.ToLower(v)
-			scenario, ok := Scenarios[v]
+			scenario, ok := scenarios[v]
 			if !ok {
 				logger.Error("unknown test case",
 					"test", n,
@@ -464,7 +464,7 @@ func doCleanup(childEnv *env.Env) (err error) {
 }
 
 func runList(cmd *cobra.Command, args []string) {
-	switch len(Scenarios) {
+	switch len(scenarios) {
 	case 0:
 		fmt.Printf("No supported test cases!\n")
 	default:
@@ -472,7 +472,7 @@ func runList(cmd *cobra.Command, args []string) {
 
 		// Sort scenarios alphabetically before printing.
 		var scenarioNames []string
-		for name := range Scenarios {
+		for name := range scenarios {
 			scenarioNames = append(scenarioNames, name)
 		}
 		sort.Strings(scenarioNames)
@@ -480,7 +480,7 @@ func runList(cmd *cobra.Command, args []string) {
 		for _, n := range scenarioNames {
 			fmt.Printf("  * %v", n)
 			var intro bool
-			Scenarios[n].Parameters().VisitAll(func(f *flag.Flag) {
+			scenarios[n].Parameters().VisitAll(func(f *flag.Flag) {
 				if !intro {
 					fmt.Printf(" (parameters:")
 					intro = true
